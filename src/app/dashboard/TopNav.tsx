@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { RestaurantRole } from "@/lib/membership";
 
 interface NavItem {
   href: string;
   label: string;
   icon: React.ReactNode;
+  staffAllowed?: boolean;
 }
 
 const NAV: NavItem[] = [
@@ -65,6 +67,7 @@ const NAV: NavItem[] = [
   {
     href: "/dashboard/kitchen",
     label: "ครัว",
+    staffAllowed: true,
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path
@@ -78,6 +81,7 @@ const NAV: NavItem[] = [
   {
     href: "/dashboard/bills",
     label: "เช็คบิล",
+    staffAllowed: true,
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path
@@ -115,6 +119,19 @@ const NAV: NavItem[] = [
     ),
   },
   {
+    href: "/dashboard/feedback",
+    label: "ส่งข้อความ",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"
+        />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard/settings",
     label: "ตั้งค่า",
     icon: (
@@ -136,12 +153,13 @@ function isActive(pathname: string | null, href: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-export default function TopNav() {
+export default function TopNav({ role = "owner" }: { role?: RestaurantRole }) {
   const pathname = usePathname();
+  const items = role === "staff" ? NAV.filter((n) => n.staffAllowed) : NAV;
 
   return (
     <nav className="no-scrollbar -mx-1 flex gap-1 overflow-x-auto">
-      {NAV.map((item) => {
+      {items.map((item) => {
         const active = isActive(pathname, item.href);
         return (
           <Link

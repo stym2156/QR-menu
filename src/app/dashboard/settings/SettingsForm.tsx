@@ -28,6 +28,10 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
   );
   const [openTime, setOpenTime] = useState(restaurant.open_time ?? "");
   const [closeTime, setCloseTime] = useState(restaurant.close_time ?? "");
+  const [serviceCharge, setServiceCharge] = useState(
+    String(restaurant.service_charge_pct ?? 0),
+  );
+  const [vatPct, setVatPct] = useState(String(restaurant.vat_pct ?? 0));
   const [savingShop, setSavingShop] = useState(false);
 
   const [currentPw, setCurrentPw] = useState("");
@@ -41,6 +45,16 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
       toast.error("กรุณาใส่ชื่อร้าน");
       return;
     }
+    const service = Number(serviceCharge);
+    const vat = Number(vatPct);
+    if (!Number.isFinite(service) || service < 0 || service > 100) {
+      toast.error("Service charge ต้องเป็น 0–100");
+      return;
+    }
+    if (!Number.isFinite(vat) || vat < 0 || vat > 100) {
+      toast.error("VAT ต้องเป็น 0–100");
+      return;
+    }
     setSavingShop(true);
     const { error } = await supabase
       .from("restaurants")
@@ -49,6 +63,8 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
         accepting_orders: acceptingOrders,
         open_time: openTime || null,
         close_time: closeTime || null,
+        service_charge_pct: service,
+        vat_pct: vat,
       })
       .eq("id", restaurant.id);
     setSavingShop(false);
@@ -155,6 +171,47 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
               className={`${input} tabular-nums`}
             />
           </FormField>
+        </div>
+
+        <div className="rounded-2xl border border-line bg-canvas/40 p-4 space-y-3">
+          <div className="text-sm font-medium text-ink">ค่าบริการ + ภาษี</div>
+          <p className="text-xs text-muted">
+            ตั้งเป็น 0 ถ้าไม่ต้องการคิด · VAT จะถูกคำนวณจาก (ยอด + service)
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Service charge %">
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={serviceCharge}
+                  onChange={(e) => setServiceCharge(e.target.value)}
+                  className={`${input} pr-7 tabular-nums`}
+                />
+                <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-muted">
+                  %
+                </span>
+              </div>
+            </FormField>
+            <FormField label="VAT %">
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={vatPct}
+                  onChange={(e) => setVatPct(e.target.value)}
+                  className={`${input} pr-7 tabular-nums`}
+                />
+                <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-sm text-muted">
+                  %
+                </span>
+              </div>
+            </FormField>
+          </div>
         </div>
 
         <button

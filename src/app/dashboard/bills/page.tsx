@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentMembership } from "@/lib/membership";
 import BillsView from "./BillsView";
 import { PageHeader } from "@/components/ui";
 import type { DiningTable, Menu, Order } from "@/lib/types";
@@ -13,14 +14,19 @@ export default async function BillsPage() {
 
   if (!user) return null;
 
+  const membership = await getCurrentMembership(supabase);
+  if (!membership) {
+    return <p className="text-muted">ยังไม่มีร้าน — กรุณา signup ใหม่</p>;
+  }
+
   const { data: restaurant } = await supabase
     .from("restaurants")
-    .select("id, name")
-    .eq("user_id", user.id)
+    .select("id, name, service_charge_pct, vat_pct")
+    .eq("id", membership.restaurantId)
     .maybeSingle();
 
   if (!restaurant) {
-    return <p className="text-muted">ยังไม่มีร้าน — กรุณา signup ใหม่</p>;
+    return <p className="text-muted">ไม่พบข้อมูลร้าน</p>;
   }
 
   const [{ data: orders }, { data: tables }, { data: menus }] = await Promise.all([
@@ -47,6 +53,8 @@ export default async function BillsPage() {
       <BillsView
         restaurantId={restaurant.id}
         restaurantName={restaurant.name}
+        serviceChargePct={Number(restaurant.service_charge_pct) || 0}
+        vatPct={Number(restaurant.vat_pct) || 0}
         initialOrders={(orders ?? []) as Order[]}
         tables={(tables ?? []) as DiningTable[]}
         menus={(menus ?? []) as Menu[]}

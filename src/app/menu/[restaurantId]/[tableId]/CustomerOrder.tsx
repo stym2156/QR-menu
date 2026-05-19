@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { formatKIP, formatTime } from "@/lib/format";
+import { calculateBill } from "@/lib/bill";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/toast";
 import { callStaff, placeOrder } from "./actions";
@@ -23,6 +24,8 @@ interface Props {
   categories: Category[];
   promotions: Promotion[];
   shopOpen?: boolean;
+  serviceChargePct?: number;
+  vatPct?: number;
 }
 
 interface CartLine {
@@ -45,6 +48,8 @@ export default function CustomerOrder({
   categories,
   promotions,
   shopOpen = true,
+  serviceChargePct = 0,
+  vatPct = 0,
 }: Props) {
   const confirm = useConfirm();
   const toast = useToast();
@@ -450,6 +455,8 @@ export default function CustomerOrder({
           tableNumber={tableNumber}
           menus={menus}
           orders={activeOrders}
+          serviceChargePct={serviceChargePct}
+          vatPct={vatPct}
           onClose={() => setShowBill(false)}
         />
       )}
@@ -809,15 +816,28 @@ interface BillModalProps {
   tableNumber: number;
   menus: Menu[];
   orders: Order[];
+  serviceChargePct: number;
+  vatPct: number;
   onClose: () => void;
 }
 
-function BillModal({ tableNumber, menus, orders, onClose }: BillModalProps) {
+function BillModal({
+  tableNumber,
+  menus,
+  orders,
+  serviceChargePct,
+  vatPct,
+  onClose,
+}: BillModalProps) {
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
 
-  const total = useMemo(
+  const subtotal = useMemo(
     () => orders.reduce((sum, o) => sum + Number(o.total), 0),
     [orders],
+  );
+  const bill = useMemo(
+    () => calculateBill(subtotal, serviceChargePct, vatPct),
+    [subtotal, serviceChargePct, vatPct],
   );
 
   return (
@@ -865,11 +885,27 @@ function BillModal({ tableNumber, menus, orders, onClose }: BillModalProps) {
               </div>
             ))}
           </div>
-          <div className="-mx-5 border-t border-line px-5 py-4">
-            <div className="flex items-baseline justify-between">
-              <span className="text-sm font-medium text-muted">ยอดรวม</span>
+          <div className="-mx-5 border-t border-line px-5 py-4 space-y-1.5">
+            <div className="flex items-baseline justify-between text-sm text-muted">
+              <span>ยอดรวมรายการ</span>
+              <span className="tabular-nums">{formatKIP(bill.subtotal)}</span>
+            </div>
+            {bill.serviceChargePct > 0 ? (
+              <div className="flex items-baseline justify-between text-sm text-muted">
+                <span>Service charge ({bill.serviceChargePct}%)</span>
+                <span className="tabular-nums">{formatKIP(bill.serviceCharge)}</span>
+              </div>
+            ) : null}
+            {bill.vatPct > 0 ? (
+              <div className="flex items-baseline justify-between text-sm text-muted">
+                <span>VAT ({bill.vatPct}%)</span>
+                <span className="tabular-nums">{formatKIP(bill.vat)}</span>
+              </div>
+            ) : null}
+            <div className="flex items-baseline justify-between border-t border-line pt-2">
+              <span className="text-sm font-medium text-muted">ยอดสุทธิ</span>
               <span className="text-2xl font-semibold tabular-nums tracking-tight text-ink">
-                {formatKIP(total)}
+                {formatKIP(bill.grandTotal)}
               </span>
             </div>
             <p className="mt-2 text-xs text-muted">

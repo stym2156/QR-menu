@@ -2,6 +2,7 @@
 // Works with regular printers and 58/80mm thermal printers (browser handles scaling).
 
 import { formatKIP, formatTime } from "@/lib/format";
+import { calculateBill } from "@/lib/bill";
 import type { Menu, Order, PaymentMethod } from "@/lib/types";
 
 const PAYMENT_LABEL: Record<PaymentMethod, string> = {
@@ -19,16 +20,19 @@ interface PrintReceiptInput {
   menus: Menu[];
   method: PaymentMethod;
   paidAt: string;
+  serviceChargePct: number;
+  vatPct: number;
 }
 
 export function printReceipt(input: PrintReceiptInput): void {
   const menuMap = new Map(input.menus.map((m) => [m.id, m]));
-  const total = input.orders.reduce((s, o) => s + Number(o.total), 0);
+  const subtotal = input.orders.reduce((s, o) => s + Number(o.total), 0);
+  const bill = calculateBill(subtotal, input.serviceChargePct, input.vatPct);
 
   const html = renderHTML({
     ...input,
     menuMap,
-    total,
+    bill,
   });
 
   const w = window.open("", "_blank", "width=400,height=600");
@@ -47,7 +51,7 @@ export function printReceipt(input: PrintReceiptInput): void {
 
 interface RenderInput extends PrintReceiptInput {
   menuMap: Map<string, Menu>;
-  total: number;
+  bill: ReturnType<typeof calculateBill>;
 }
 
 function renderHTML(input: RenderInput): string {
@@ -119,8 +123,22 @@ function renderHTML(input: RenderInput): string {
   <hr/>
   <table>
     <tr>
-      <td class="grand">รวม</td>
-      <td class="total grand">${formatKIP(input.total)}</td>
+      <td>รวมรายการ</td>
+      <td class="total">${formatKIP(input.bill.subtotal)}</td>
+    </tr>
+    ${
+      input.bill.serviceChargePct > 0
+        ? `<tr><td>Service ${input.bill.serviceChargePct}%</td><td class="total">${formatKIP(input.bill.serviceCharge)}</td></tr>`
+        : ""
+    }
+    ${
+      input.bill.vatPct > 0
+        ? `<tr><td>VAT ${input.bill.vatPct}%</td><td class="total">${formatKIP(input.bill.vat)}</td></tr>`
+        : ""
+    }
+    <tr>
+      <td class="grand">ยอดสุทธิ</td>
+      <td class="total grand">${formatKIP(input.bill.grandTotal)}</td>
     </tr>
     <tr>
       <td>ชำระโดย</td>

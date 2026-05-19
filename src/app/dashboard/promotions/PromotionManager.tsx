@@ -32,6 +32,8 @@ export default function PromotionManager({
   const [promotions, setPromotions] = useState<Promotion[]>(initialPromotions);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [startAt, setStartAt] = useState("");
+  const [endAt, setEndAt] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +84,8 @@ export default function PromotionManager({
         image_url: imageUrl,
         active: true,
         sort_order,
+        start_at: startAt ? new Date(startAt).toISOString() : null,
+        end_at: endAt ? new Date(endAt).toISOString() : null,
       })
       .select()
       .single();
@@ -95,6 +99,8 @@ export default function PromotionManager({
     setPromotions((prev) => [...prev, data as Promotion]);
     setTitle("");
     setDescription("");
+    setStartAt("");
+    setEndAt("");
     setFile(null);
     setBusy(false);
   }
@@ -156,6 +162,31 @@ export default function PromotionManager({
             placeholder="เช่น เครื่องดื่มทุกแก้ว ลด 20%"
           />
         </FormField>
+
+        <div className="rounded-2xl border border-line bg-canvas/40 p-4 space-y-3">
+          <div className="text-sm font-medium text-ink">กำหนดเวลาแสดง (ไม่บังคับ)</div>
+          <p className="text-xs text-muted">
+            เว้นว่าง = แสดงตลอดเวลาที่เปิดอยู่
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <FormField label="เริ่มแสดง">
+              <input
+                type="datetime-local"
+                value={startAt}
+                onChange={(e) => setStartAt(e.target.value)}
+                className={`${input} tabular-nums`}
+              />
+            </FormField>
+            <FormField label="หมดเขต">
+              <input
+                type="datetime-local"
+                value={endAt}
+                onChange={(e) => setEndAt(e.target.value)}
+                className={`${input} tabular-nums`}
+              />
+            </FormField>
+          </div>
+        </div>
 
         <FormField
           label="รูปภาพ"

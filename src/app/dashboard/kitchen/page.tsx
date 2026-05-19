@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentMembership } from "@/lib/membership";
 import KitchenDisplay from "./KitchenDisplay";
 import { PageHeader } from "@/components/ui";
 import type { CallStaffRequest, DiningTable, Menu, Order } from "@/lib/types";
@@ -13,15 +14,11 @@ export default async function KitchenPage() {
 
   if (!user) return null;
 
-  const { data: restaurant } = await supabase
-    .from("restaurants")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!restaurant) {
+  const membership = await getCurrentMembership(supabase);
+  if (!membership) {
     return <p className="text-muted">ยังไม่มีร้าน — กรุณา signup ใหม่</p>;
   }
+  const restaurant = { id: membership.restaurantId };
 
   const [{ data: orders }, { data: menus }, { data: tables }, { data: calls }] =
     await Promise.all([

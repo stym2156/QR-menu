@@ -21,13 +21,13 @@ export default async function CustomerMenuPage({ params }: { params: Params }) {
   ] = await Promise.all([
     supabase
       .from("tables")
-      .select("id, table_number, restaurant_id")
+      .select("id, table_number, restaurant_id, is_open")
       .eq("id", tableId)
       .eq("restaurant_id", restaurantId)
       .maybeSingle(),
     supabase
       .from("restaurants")
-      .select("name, accepting_orders, open_time, close_time")
+      .select("name, accepting_orders, open_time, close_time, service_charge_pct, vat_pct")
       .eq("id", restaurantId)
       .maybeSingle(),
     supabase
@@ -46,17 +46,21 @@ export default async function CustomerMenuPage({ params }: { params: Params }) {
       .select("*")
       .eq("restaurant_id", restaurantId)
       .eq("active", true)
+      .or(`start_at.is.null,start_at.lte.${new Date().toISOString()}`)
+      .or(`end_at.is.null,end_at.gte.${new Date().toISOString()}`)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false }),
   ]);
 
   if (!table || !restaurant) notFound();
 
+  const tableIsOpen = (table as { is_open?: boolean }).is_open ?? false;
   const shopStatus = getShopStatus({
     accepting_orders: restaurant.accepting_orders ?? true,
     open_time: restaurant.open_time ?? null,
     close_time: restaurant.close_time ?? null,
   });
+  const canOrder = shopStatus.isOpen && tableIsOpen;
 
   return (
     <main className="min-h-screen bg-canvas pb-36">
@@ -97,6 +101,16 @@ export default async function CustomerMenuPage({ params }: { params: Params }) {
                 : "กรุณามาใหม่ในเวลาทำการ"}
           </p>
         </div>
+      ) : !tableIsOpen ? (
+        <div className="border-b border-amber-200 bg-amber-50 px-5 py-6 text-center">
+          <div className="mb-1 text-3xl">🔒</div>
+          <h2 className="text-base font-semibold tracking-tight text-amber-900">
+            โต๊ะนี้ยังไม่เปิดให้สั่ง
+          </h2>
+          <p className="mt-1 text-sm text-amber-800">
+            กรุณาแจ้งพนักงานเพื่อเปิดโต๊ะให้คุณสั่งอาหาร
+          </p>
+        </div>
       ) : null}
 
       <CustomerOrder
@@ -106,7 +120,9 @@ export default async function CustomerMenuPage({ params }: { params: Params }) {
         menus={(menus ?? []) as Menu[]}
         categories={(categories ?? []) as Category[]}
         promotions={(promotions ?? []) as Promotion[]}
-        shopOpen={shopStatus.isOpen}
+        shopOpen={canOrder}
+        serviceChargePct={Number(restaurant.service_charge_pct) || 0}
+        vatPct={Number(restaurant.vat_pct) || 0}
       />
     </main>
   );

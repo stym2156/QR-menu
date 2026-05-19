@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentMembership } from "@/lib/membership";
 import { formatKIP } from "@/lib/format";
 import { PageHeader } from "@/components/ui";
 import StatsPage from "./stats/page";
@@ -12,13 +14,10 @@ export default async function DashboardPage() {
 
   if (!user) return null;
 
-  const { data: restaurant } = await supabase
-    .from("restaurants")
-    .select("id, name")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const membership = await getCurrentMembership(supabase);
+  if (membership?.role === "staff") redirect("/dashboard/kitchen");
 
-  const restaurantId = restaurant?.id ?? "";
+  const restaurantId = membership?.restaurantId ?? "";
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);

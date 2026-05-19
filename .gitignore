@@ -9,3 +9,9 @@ out
 next-env.d.ts
 .vercel
 .turbo
+tsconfig.tsbuildinfo
+
+# IDE / editor state
+.claude/
+.idea/
+.vscode/

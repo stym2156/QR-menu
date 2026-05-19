@@ -157,6 +157,7 @@ export default function TableManager({ restaurantId, initialTables }: Props) {
                   origin={origin}
                   onDelete={() => deleteTable(table)}
                   onDownload={() => downloadQR(table)}
+                  onToggleOpen={() => toggleOpen(table)}
                 />
               ))}
             </div>
@@ -173,6 +174,7 @@ interface TableCardProps {
   origin: string;
   onDelete: () => void;
   onDownload: () => void;
+  onToggleOpen: () => void;
 }
 
 function TableCard({
@@ -181,6 +183,7 @@ function TableCard({
   origin,
   onDelete,
   onDownload,
+  onToggleOpen,
 }: TableCardProps) {
   const [qrSrc, setQrSrc] = useState<string | null>(null);
   const url = origin ? `${origin}/menu/${restaurantId}/${table.id}` : "";
@@ -197,21 +200,51 @@ function TableCard({
   }, [url]);
 
   return (
-    <div className="rounded-2xl border border-line bg-surface p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-ink text-xs font-semibold tabular-nums text-surface">
+    <div
+      className={`rounded-2xl border bg-surface p-4 transition ${
+        table.is_open ? "border-emerald-200 ring-1 ring-emerald-100" : "border-line"
+      }`}
+    >
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-ink text-xs font-semibold tabular-nums text-surface">
             {table.table_number}
           </span>
-          <span className="text-sm font-medium text-ink">โต๊ะที่ {table.table_number}</span>
+          <span className="text-sm font-medium text-ink">
+            โต๊ะที่ {table.table_number}
+          </span>
+          {table.is_open ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-700">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              </span>
+              เปิดใช้
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-full bg-canvas px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted">
+              ปิดอยู่
+            </span>
+          )}
         </div>
         <button
           onClick={onDelete}
-          className="rounded-lg px-2 py-1 text-xs font-medium text-muted transition hover:bg-red-50 hover:text-red-600"
+          className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-muted transition hover:bg-red-50 hover:text-red-600"
         >
           ลบ
         </button>
       </div>
+
+      <button
+        onClick={onToggleOpen}
+        className={`mb-3 w-full rounded-xl px-3 py-2 text-xs font-medium transition active:scale-[0.98] ${
+          table.is_open
+            ? "border border-line bg-surface text-ink hover:bg-canvas"
+            : "bg-ink text-surface shadow-ink hover:bg-ink/85"
+        }`}
+      >
+        {table.is_open ? "🛑 ปิดโต๊ะ (จบบริการ)" : "เปิดโต๊ะ (รับลูกค้า)"}
+      </button>
 
       <div className="flex gap-3">
         <div className="h-28 w-28 shrink-0 overflow-hidden rounded-xl border border-line bg-canvas p-1.5">

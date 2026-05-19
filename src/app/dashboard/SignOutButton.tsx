@@ -16,7 +16,7 @@ export default function SignOutButton() {
   return (
     <button
       onClick={handleSignOut}
-      className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-muted transition hover:border-ink/30 hover:text-ink"
+      className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-red-600 transition hover:border-red-200 hover:bg-red-50"
     >
       ออกจากระบบ
     </button>

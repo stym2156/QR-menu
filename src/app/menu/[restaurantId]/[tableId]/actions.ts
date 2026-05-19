@@ -54,16 +54,22 @@ export async function placeOrder(
     };
   }
 
-  // Verify table belongs to the restaurant.
+  // Verify table belongs to the restaurant AND is currently open.
   const { data: table, error: tableErr } = await supabase
     .from("tables")
-    .select("id, restaurant_id")
+    .select("id, restaurant_id, is_open")
     .eq("id", input.tableId)
     .eq("restaurant_id", input.restaurantId)
     .maybeSingle();
 
   if (tableErr) return { ok: false, error: tableErr.message };
   if (!table) return { ok: false, error: "ไม่พบโต๊ะนี้ในร้าน" };
+  if (!table.is_open) {
+    return {
+      ok: false,
+      error: "โต๊ะนี้ยังไม่เปิด กรุณาแจ้งพนักงาน",
+    };
+  }
 
   // Check shop is open (accepting orders + within hours).
   const { data: restaurant } = await supabase

@@ -8,6 +8,8 @@ export type Restaurant = {
   accepting_orders: boolean;
   open_time: string | null;
   close_time: string | null;
+  service_charge_pct: number;
+  vat_pct: number;
   created_at: string;
 };
 
@@ -94,5 +96,7 @@ export type Promotion = {
   image_url: string | null;
   active: boolean;
   sort_order: number;
+  start_at: string | null;
+  end_at: string | null;
   created_at: string;
 };

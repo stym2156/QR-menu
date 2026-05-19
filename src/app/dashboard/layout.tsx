@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentMembership } from "@/lib/membership";
 import SignOutButton from "./SignOutButton";
 import TopNav from "./TopNav";
 
@@ -16,13 +17,17 @@ export default async function DashboardLayout({
 
   if (!user) redirect("/login");
 
-  const { data: restaurant } = await supabase
-    .from("restaurants")
-    .select("name")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const membership = await getCurrentMembership(supabase);
+  const { data: restaurant } = membership
+    ? await supabase
+        .from("restaurants")
+        .select("name")
+        .eq("id", membership.restaurantId)
+        .maybeSingle()
+    : { data: null };
 
   const restaurantName = restaurant?.name ?? "ร้านของคุณ";
+  const role = membership?.role ?? "owner";
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -35,12 +40,17 @@ export default async function DashboardLayout({
             >
               ShopQR
             </Link>
-            <TopNav />
+            <TopNav role={role} />
           </div>
           <div className="hidden items-center gap-3 sm:flex">
             <span className="max-w-[14ch] truncate text-xs text-muted">
               {restaurantName}
             </span>
+            {role === "staff" ? (
+              <span className="rounded-full bg-canvas px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted">
+                staff
+              </span>
+            ) : null}
             <SignOutButton />
           </div>
         </div>

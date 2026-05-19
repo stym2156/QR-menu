@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatKIP, formatTime } from "@/lib/format";
+import { calculateBill } from "@/lib/bill";
 import { EmptyState, buttonPrimary, buttonSecondary } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { printReceipt } from "./receipt";
@@ -16,6 +17,8 @@ import type {
 interface Props {
   restaurantId: string;
   restaurantName: string;
+  serviceChargePct: number;
+  vatPct: number;
   initialOrders: Order[];
   tables: DiningTable[];
   menus: Menu[];
@@ -32,6 +35,8 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: string }[] =
 export default function BillsView({
   restaurantId,
   restaurantName,
+  serviceChargePct,
+  vatPct,
   initialOrders,
   tables,
   menus,
@@ -154,13 +159,23 @@ export default function BillsView({
       return;
     }
 
+    // Auto-close the table after settling — customer can't accidentally
+    // (or maliciously) submit more orders after they leave.
+    const { error: closeError } = await supabase
+      .from("tables")
+      .update({ is_open: false })
+      .eq("id", tableId);
+    if (closeError) {
+      toast.error(`ปิดโต๊ะอัตโนมัติไม่สำเร็จ: ${closeError.message}`);
+    }
+
     setLastSettled({
       orders: tableOrders,
       table: tableMap.get(tableId),
       method,
       paidAt: now,
     });
-    toast.success("รับชำระเรียบร้อย");
+    toast.success("รับชำระเรียบร้อย · ปิดโต๊ะแล้ว");
   }
 
   function handlePrintLastReceipt(): void {
@@ -172,6 +187,8 @@ export default function BillsView({
       menus,
       method: lastSettled.method,
       paidAt: lastSettled.paidAt,
+      serviceChargePct,
+      vatPct,
     });
   }
 
@@ -262,6 +279,8 @@ export default function BillsView({
         <BillModal
           group={selectedGroup}
           menuMap={menuMap}
+          serviceChargePct={serviceChargePct}
+          vatPct={vatPct}
           onClose={() => setSelectedTableId(null)}
           onSettle={async (method) => {
             await settleBill(selectedGroup.tableId, method);
@@ -284,16 +303,21 @@ type Group = {
 function BillModal({
   group,
   menuMap,
+  serviceChargePct,
+  vatPct,
   onClose,
   onSettle,
 }: {
   group: Group;
   menuMap: Map<string, Menu>;
+  serviceChargePct: number;
+  vatPct: number;
   onClose: () => void;
   onSettle: (method: PaymentMethod) => Promise<void>;
 }) {
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [busy, setBusy] = useState(false);
+  const bill = calculateBill(group.total, serviceChargePct, vatPct);
 
   async function handleSettle(): Promise<void> {
     setBusy(true);
@@ -363,11 +387,26 @@ function BillModal({
             ))}
           </div>
 
-          <div className="mt-6 rounded-2xl bg-canvas p-4">
-            <div className="flex items-baseline justify-between">
-              <span className="text-sm font-medium text-muted">ยอดรวม</span>
+          <div className="mt-6 space-y-1.5 rounded-2xl bg-canvas p-4">
+            <BillLine label="ยอดรวมรายการ" value={bill.subtotal} muted />
+            {bill.serviceChargePct > 0 ? (
+              <BillLine
+                label={`Service charge (${bill.serviceChargePct}%)`}
+                value={bill.serviceCharge}
+                muted
+              />
+            ) : null}
+            {bill.vatPct > 0 ? (
+              <BillLine
+                label={`VAT (${bill.vatPct}%)`}
+                value={bill.vat}
+                muted
+              />
+            ) : null}
+            <div className="mt-2 flex items-baseline justify-between border-t border-line pt-2">
+              <span className="text-sm font-medium text-muted">ยอดสุทธิ</span>
               <span className="text-3xl font-semibold tabular-nums tracking-tight text-ink">
-                {formatKIP(group.total)}
+                {formatKIP(bill.grandTotal)}
               </span>
             </div>
           </div>
@@ -399,10 +438,31 @@ function BillModal({
             disabled={busy}
             className={`${buttonPrimary} mt-6 w-full py-3.5 text-base`}
           >
-            {busy ? "กำลังบันทึก..." : `รับชำระ ${formatKIP(group.total)}`}
+            {busy ? "กำลังบันทึก..." : `รับชำระ ${formatKIP(bill.grandTotal)}`}
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function BillLine({
+  label,
+  value,
+  muted,
+}: {
+  label: string;
+  value: number;
+  muted?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-baseline justify-between text-sm ${
+        muted ? "text-muted" : "text-ink"
+      }`}
+    >
+      <span>{label}</span>
+      <span className="tabular-nums">{formatKIP(value)}</span>
     </div>
   );
 }
