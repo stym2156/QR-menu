@@ -37,7 +37,11 @@ export function MenuCard({
       }`}
     >
       <div className="flex gap-3 p-3">
-        <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-line bg-canvas">
+        <div
+          className={`relative h-24 w-24 shrink-0 overflow-hidden rounded-xl ${
+            menu.image_url ? "" : "border border-line bg-canvas"
+          }`}
+        >
           {menu.image_url ? (
             <Image
               src={menu.image_url}

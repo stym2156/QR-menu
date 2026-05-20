@@ -290,7 +290,13 @@ export default function MenuManager({
                   >
                   <div className="flex items-center gap-4 p-3.5">
                     {/* รูปภาพเมนู */}
-                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-line bg-canvas">
+                    <div
+                      className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-xl ${
+                        menu.image_url
+                          ? ""
+                          : "border border-line bg-canvas"
+                      }`}
+                    >
                       {menu.image_url ? (
                         <Image
                           src={menu.image_url}
