@@ -67,14 +67,14 @@ export default function SignupPage() {
         className="mb-8 inline-flex items-center gap-2 self-center text-base font-semibold tracking-tight text-ink"
       >
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-ink text-xs font-bold text-surface">
-          S
+          Q
         </span>
-        ShopQR
+        QR Menu
       </Link>
 
       <div className={`${card} ${cardPad}`}>
         <h1 className="text-xl font-semibold tracking-tight text-ink">เปิดร้านใหม่</h1>
-        <p className="mt-1 text-sm text-muted">สมัครสมาชิก ShopQR ฟรี ใช้งานได้ทันที</p>
+        <p className="mt-1 text-sm text-muted">สมัครสมาชิกฟรี ใช้งานได้ทันที</p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <FormField label="ชื่อร้าน">

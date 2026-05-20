@@ -38,7 +38,7 @@ export default async function DashboardLayout({
               href="/dashboard"
               className="shrink-0 text-base font-semibold tracking-tight text-ink"
             >
-              ShopQR
+              QR Menu
             </Link>
             <TopNav role={role} />
           </div>

@@ -6,9 +6,9 @@ export default function HomePage() {
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center gap-10 px-6 py-16 text-center">
       <div className="flex items-center gap-2 text-sm font-semibold tracking-tight text-ink">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-xs font-bold text-surface">
-          S
+          Q
         </span>
-        ShopQR
+        QR Menu
       </div>
 
       <div className="space-y-4">

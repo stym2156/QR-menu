@@ -47,9 +47,9 @@ export default function LoginPage() {
         className="mb-8 inline-flex items-center gap-2 self-center text-base font-semibold tracking-tight text-ink"
       >
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-ink text-xs font-bold text-surface">
-          S
+          Q
         </span>
-        ShopQR
+        QR Menu
       </Link>
 
       <div className={`${card} ${cardPad}`}>
