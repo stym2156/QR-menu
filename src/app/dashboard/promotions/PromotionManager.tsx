@@ -195,10 +195,12 @@ export default function PromotionManager({
           <div className="flex items-center gap-3">
             {filePreview ? (
               <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-line bg-canvas">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={filePreview}
                   alt="preview"
+                  width={64}
+                  height={64}
+                  unoptimized
                   className="h-full w-full object-contain"
                 />
               </div>

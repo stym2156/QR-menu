@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import QRCode from "qrcode";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -249,10 +250,12 @@ function TableCard({
       <div className="flex gap-3">
         <div className="h-28 w-28 shrink-0 overflow-hidden rounded-xl border border-line bg-canvas p-1.5">
           {qrSrc ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={qrSrc}
               alt={`QR table ${table.table_number}`}
+              width={112}
+              height={112}
+              unoptimized
               className="h-full w-full"
             />
           ) : (
