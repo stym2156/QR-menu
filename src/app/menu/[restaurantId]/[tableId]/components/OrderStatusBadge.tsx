@@ -23,6 +23,13 @@ export function OrderStatusBadge({ status }: { status: Order["status"] }) {
       </span>
     );
   }
+  if (status === "cancelled") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium normal-case tracking-normal text-red-700">
+        ✕ ยกเลิก
+      </span>
+    );
+  }
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-canvas px-2 py-0.5 text-[10px] font-medium normal-case tracking-normal text-muted">
       ✓ เสิร์ฟแล้ว

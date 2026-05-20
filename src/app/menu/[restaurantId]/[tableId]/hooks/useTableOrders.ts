@@ -62,6 +62,13 @@ export function useTableOrders({
           if (old.status !== "ready" && next.status === "ready") {
             toast.success("ออเดอร์ของคุณพร้อมเสิร์ฟแล้ว!");
           }
+          if (old.status !== "cancelled" && next.status === "cancelled") {
+            toast.error(
+              next.cancel_reason
+                ? `ออเดอร์ถูกยกเลิก: ${next.cancel_reason}`
+                : "ออเดอร์ถูกยกเลิกโดยร้าน",
+            );
+          }
           if (!old.paid && next.paid) {
             toast.success("รับชำระเรียบร้อย ขอบคุณครับ");
           }

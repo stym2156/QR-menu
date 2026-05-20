@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { playChime, unlockAudio } from "@/lib/sound";
 import { formatKIP, formatTime } from "@/lib/format";
 import { EmptyState, StatusPill } from "@/components/ui";
-import { useConfirm } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/toast";
 import { useKitchenRealtime } from "./useKitchenRealtime";
+import { CancelOrderDialog } from "./CancelOrderDialog";
 import type {
   CallStaffRequest,
   DiningTable,
@@ -15,8 +14,6 @@ import type {
   Order,
   OrderStatus,
 } from "@/lib/types";
-
-const SOUND_STORAGE_KEY = "shopqr.kitchen.sound";
 
 interface Props {
   restaurantId: string;
@@ -34,54 +31,19 @@ export default function KitchenDisplay({
   tables,
 }: Props) {
   const supabase = createClient();
-  const confirm = useConfirm();
   const toast = useToast();
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [calls, setCalls] = useState<CallStaffRequest[]>(initialCalls);
-  const [soundOn, setSoundOn] = useState(false);
-  const soundRef = useRef(false);
+  const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
 
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
   const tableMap = useMemo(() => new Map(tables.map((t) => [t.id, t])), [tables]);
 
-  // Restore sound preference from localStorage on mount.
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(SOUND_STORAGE_KEY) === "on") {
-        setSoundOn(true);
-      }
-    } catch {
-      // localStorage unavailable (private mode / disabled cookies); ignore.
-    }
-  }, []);
-
-  // Persist preference + sync ref + ensure audio is unlocked while on.
-  // AudioContext needs a user gesture to resume after page reload, so we
-  // attach a one-shot listener that resumes on the next interaction.
-  useEffect(() => {
-    soundRef.current = soundOn;
-    try {
-      localStorage.setItem(SOUND_STORAGE_KEY, soundOn ? "on" : "off");
-    } catch {
-      // ignore
-    }
-    if (!soundOn) return;
-    unlockAudio();
-    const handler = (): void => unlockAudio();
-    document.addEventListener("pointerdown", handler, {
-      once: true,
-      capture: true,
-    });
-    return () => {
-      document.removeEventListener("pointerdown", handler, true);
-    };
-  }, [soundOn]);
-
+  // Realtime: sound notifications are now handled globally by SoundProvider in
+  // the dashboard layout, so the kitchen page no longer manages a chime ref.
   useKitchenRealtime({
     supabase,
     restaurantId,
-    soundRef,
-    playChime,
     setOrders,
     setCalls,
   });
@@ -98,20 +60,27 @@ export default function KitchenDisplay({
     }
   }
 
-  async function cancelOrder(order: Order): Promise<void> {
+  async function confirmCancel(reason: string): Promise<void> {
+    const order = cancelTarget;
+    if (!order) return;
     const tableNum = tableMap.get(order.table_id)?.table_number;
-    const ok = await confirm({
-      title: `ยกเลิกออเดอร์โต๊ะที่ ${tableNum}?`,
-      description: "ออเดอร์จะหายจากครัวและบิล การกระทำนี้ย้อนกลับไม่ได้",
-      confirmText: "ยกเลิกออเดอร์",
-      cancelText: "เก็บไว้",
-      tone: "danger",
-    });
-    if (!ok) return;
+
+    // Optimistic: remove from kitchen columns immediately
     setOrders((prev) => prev.filter((o) => o.id !== order.id));
-    const { error } = await supabase.from("orders").delete().eq("id", order.id);
-    if (error) toast.error(`ยกเลิกไม่สำเร็จ: ${error.message}`);
-    else toast.success(`ยกเลิกออเดอร์โต๊ะ ${tableNum} แล้ว`);
+    setCancelTarget(null);
+
+    const { error } = await supabase
+      .from("orders")
+      .update({ status: "cancelled", cancel_reason: reason })
+      .eq("id", order.id);
+
+    if (error) {
+      // Rollback on failure
+      setOrders((prev) => [...prev, order]);
+      toast.error(`ยกเลิกไม่สำเร็จ: ${error.message}`);
+    } else {
+      toast.success(`ยกเลิกออเดอร์โต๊ะ ${tableNum} แล้ว`);
+    }
   }
 
   async function ackCall(call: CallStaffRequest): Promise<void> {
@@ -127,34 +96,9 @@ export default function KitchenDisplay({
 
   return (
     <div className="space-y-5">
-      {soundOn ? (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5">
-          <span className="flex items-center gap-2 text-sm font-medium text-emerald-800">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-            </span>
-            <span>🔔 เสียงแจ้งเตือนเปิดอยู่</span>
-          </span>
-          <button
-            onClick={() => setSoundOn(false)}
-            className="rounded-md border border-emerald-200 bg-surface px-3 py-1 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100"
-          >
-            ปิดเสียง
-          </button>
-        </div>
-      ) : (
-        <button
-          onClick={() => setSoundOn(true)}
-          className="flex w-full items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left text-sm text-amber-900 transition hover:bg-amber-100"
-        >
-          <span className="flex items-center gap-2">
-            <span className="text-base">🔕</span>
-            <span className="font-medium">เปิดเสียงแจ้งเตือนเมื่อมีออเดอร์ใหม่</span>
-          </span>
-          <span className="text-xs text-amber-700">คลิกเพื่อเปิด</span>
-        </button>
-      )}
+      <p className="rounded-xl border border-line bg-canvas/60 px-4 py-2.5 text-xs text-muted">
+        💡 เปิด/ปิดเสียงแจ้งเตือนได้จากปุ่มกระดิ่งบนหัวเว็บ — ใช้งานได้ทุกหน้าใน dashboard
+      </p>
 
       {calls.length > 0 && (
         <section className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
@@ -204,7 +148,7 @@ export default function KitchenDisplay({
           actions={(o) => (
             <div className="flex gap-2">
               <button
-                onClick={() => cancelOrder(o)}
+                onClick={() => setCancelTarget(o)}
                 className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-muted transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
               >
                 ยกเลิก
@@ -235,6 +179,14 @@ export default function KitchenDisplay({
           )}
         />
       </div>
+
+      {cancelTarget ? (
+        <CancelOrderDialog
+          tableNumber={tableMap.get(cancelTarget.table_id)?.table_number ?? "?"}
+          onConfirm={confirmCancel}
+          onClose={() => setCancelTarget(null)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -35,6 +35,7 @@ export default async function BillsPage() {
       .select("*")
       .eq("restaurant_id", restaurant.id)
       .eq("paid", false)
+      .neq("status", "cancelled")
       .order("created_at", { ascending: true }),
     supabase
       .from("tables")

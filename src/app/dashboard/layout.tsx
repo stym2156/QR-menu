@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMembership } from "@/lib/membership";
+import { SoundProvider } from "@/components/SoundProvider";
+import { SoundToggle } from "@/components/SoundToggle";
 import SignOutButton from "./SignOutButton";
 import TopNav from "./TopNav";
 
@@ -30,32 +32,37 @@ export default async function DashboardLayout({
   const role = membership?.role ?? "owner";
 
   return (
-    <div className="min-h-screen bg-canvas">
-      <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-5 py-3">
-          <div className="flex min-w-0 items-center gap-6">
-            <Link
-              href="/dashboard"
-              className="shrink-0 text-base font-semibold tracking-tight text-ink"
-            >
-              QR Menu
-            </Link>
-            <TopNav role={role} />
-          </div>
-          <div className="hidden items-center gap-3 sm:flex">
-            <span className="max-w-[14ch] truncate text-xs text-muted">
-              {restaurantName}
-            </span>
-            {role === "staff" ? (
-              <span className="rounded-full bg-canvas px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted">
-                staff
+    <SoundProvider restaurantId={membership?.restaurantId ?? null}>
+      <div className="min-h-screen bg-canvas">
+        <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-5 py-3">
+            <div className="flex min-w-0 items-center gap-6">
+              <Link
+                href="/dashboard"
+                className="shrink-0 text-base font-semibold tracking-tight text-ink"
+              >
+                QR Menu
+              </Link>
+              <TopNav role={role} />
+            </div>
+            <div className="flex items-center gap-3">
+              <SoundToggle />
+              <span className="hidden max-w-[14ch] truncate text-xs text-muted sm:inline">
+                {restaurantName}
               </span>
-            ) : null}
-            <SignOutButton />
+              {role === "staff" ? (
+                <span className="hidden rounded-full bg-canvas px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted sm:inline">
+                  staff
+                </span>
+              ) : null}
+              <div className="hidden sm:block">
+                <SignOutButton />
+              </div>
+            </div>
           </div>
-        </div>
-      </header>
-      <main className="mx-auto max-w-6xl px-5 py-8">{children}</main>
-    </div>
+        </header>
+        <main className="mx-auto max-w-6xl px-5 py-8">{children}</main>
+      </div>
+    </SoundProvider>
   );
 }

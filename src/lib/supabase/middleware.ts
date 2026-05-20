@@ -24,9 +24,23 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getUser() can throw "Invalid Refresh Token" if the auth cookie is stale
+  // (e.g. user signed out elsewhere, project was reset). Treat as logged-out
+  // and clear the broken cookies so the client doesn't loop on it.
+  let user: { id: string } | null = null;
+  try {
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+  } catch {
+    user = null;
+    // Best-effort: clear any sb- auth cookies on the response so the next
+    // request starts clean.
+    for (const c of request.cookies.getAll()) {
+      if (c.name.startsWith("sb-")) {
+        response.cookies.set(c.name, "", { maxAge: 0, path: "/" });
+      }
+    }
+  }
 
   const url = request.nextUrl;
   const isDashboard = url.pathname.startsWith("/dashboard");

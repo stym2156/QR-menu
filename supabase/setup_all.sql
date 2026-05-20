@@ -218,6 +218,18 @@ create index if not exists promotions_schedule_idx
   on public.promotions(restaurant_id, active, start_at, end_at);
 
 -- ============================================================
+-- 0010: Order cancellation with reason
+-- (kitchen marks order as 'cancelled' instead of deleting it)
+-- ============================================================
+
+do $$ begin
+  alter type order_status add value if not exists 'cancelled';
+exception when others then null; end $$;
+
+alter table public.orders
+  add column if not exists cancel_reason text;
+
+-- ============================================================
 -- 0009: Multi-staff roles (restaurant_members + updated trigger + new RLS)
 -- ============================================================
 

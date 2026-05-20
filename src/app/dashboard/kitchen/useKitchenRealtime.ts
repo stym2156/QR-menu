@@ -7,17 +7,20 @@ import type { CallStaffRequest, Order } from "@/lib/types";
 interface UseKitchenRealtimeOptions {
   supabase: SupabaseClient;
   restaurantId: string;
-  soundRef: React.RefObject<boolean>;
-  playChime: () => void;
   setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
   setCalls: React.Dispatch<React.SetStateAction<CallStaffRequest[]>>;
 }
 
+/**
+ * Local realtime subscription for the kitchen page — keeps the on-screen order
+ * and call-staff lists in sync. Sound notifications are handled globally by
+ * `SoundProvider`, so this hook intentionally does NOT play any chime.
+ *
+ * Orders that move to `served` or `cancelled` are removed from kitchen view.
+ */
 export function useKitchenRealtime({
   supabase,
   restaurantId,
-  soundRef,
-  playChime,
   setOrders,
   setCalls,
 }: UseKitchenRealtimeOptions): void {
@@ -33,8 +36,11 @@ export function useKitchenRealtime({
           filter: `restaurant_id=eq.${restaurantId}`,
         },
         (payload) => {
-          setOrders((prev) => [...prev, payload.new as Order]);
-          if (soundRef.current) playChime();
+          const next = payload.new as Order;
+          // Only surface active orders in the kitchen
+          if (next.status === "pending" || next.status === "ready") {
+            setOrders((prev) => [...prev, next]);
+          }
         },
       )
       .on(
@@ -48,7 +54,10 @@ export function useKitchenRealtime({
         (payload) => {
           const next = payload.new as Order;
           setOrders((prev) => {
-            if (next.status === "served") return prev.filter((o) => o.id !== next.id);
+            // Remove from kitchen once it leaves the active states
+            if (next.status === "served" || next.status === "cancelled") {
+              return prev.filter((o) => o.id !== next.id);
+            }
             return prev.map((o) => (o.id === next.id ? next : o));
           });
         },
@@ -76,7 +85,6 @@ export function useKitchenRealtime({
         },
         (payload) => {
           setCalls((prev) => [...prev, payload.new as CallStaffRequest]);
-          if (soundRef.current) playChime();
         },
       )
       .on(
@@ -101,5 +109,5 @@ export function useKitchenRealtime({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [supabase, restaurantId, soundRef, playChime, setOrders, setCalls]);
+  }, [supabase, restaurantId, setOrders, setCalls]);
 }

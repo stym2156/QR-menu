@@ -1,4 +1,4 @@
-export type OrderStatus = "pending" | "ready" | "served";
+export type OrderStatus = "pending" | "ready" | "served" | "cancelled";
 export type PaymentMethod = "cash" | "transfer" | "promptpay" | "card" | "other";
 
 export type Restaurant = {
@@ -76,6 +76,7 @@ export type Order = {
   paid: boolean;
   paid_at: string | null;
   payment_method: PaymentMethod | null;
+  cancel_reason: string | null;
   created_at: string;
 };
 

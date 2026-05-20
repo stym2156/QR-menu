@@ -86,7 +86,9 @@ export default function BillsView({
         },
         (payload) => {
           const next = payload.new as Order;
-          if (!next.paid) setOrders((prev) => [...prev, next]);
+          if (!next.paid && next.status !== "cancelled") {
+            setOrders((prev) => [...prev, next]);
+          }
         },
       )
       .on(
@@ -100,7 +102,10 @@ export default function BillsView({
         (payload) => {
           const next = payload.new as Order;
           setOrders((prev) => {
-            if (next.paid) return prev.filter((o) => o.id !== next.id);
+            // Drop from bill view if it's paid OR cancelled
+            if (next.paid || next.status === "cancelled") {
+              return prev.filter((o) => o.id !== next.id);
+            }
             const exists = prev.some((o) => o.id === next.id);
             if (exists) return prev.map((o) => (o.id === next.id ? next : o));
             return [...prev, next];
