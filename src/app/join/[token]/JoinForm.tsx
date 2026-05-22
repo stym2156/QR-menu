@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { LanguageSwitcher } from "@/lib/i18n/LanguageSwitcher";
 import { FormField, buttonPrimary, buttonSecondary, input } from "@/components/ui";
+import { PasswordInput } from "@/components/PasswordInput";
 
 interface Props {
   token: string;
@@ -164,14 +165,10 @@ export default function JoinForm({ token, restaurantName, role }: Props) {
           label={t("auth.field.password")}
           hint={mode === "signup" ? t("auth.field.password.hint") : undefined}
         >
-          <input
-            type="password"
+          <PasswordInput
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={setPassword}
             required
-            minLength={6}
-            className={input}
-            placeholder="••••••••"
             autoComplete={mode === "signup" ? "new-password" : "current-password"}
           />
         </FormField>

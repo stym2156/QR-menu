@@ -13,6 +13,7 @@ import {
   cardPad,
   input,
 } from "@/components/ui";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -100,6 +101,8 @@ export default function SignupPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
+              name="email"
               className={input}
               placeholder={t("auth.field.email.placeholder")}
             />
@@ -109,14 +112,11 @@ export default function SignupPage() {
             label={t("auth.field.password")}
             hint={t("auth.field.password.hint")}
           >
-            <input
-              type="password"
+            <PasswordInput
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={setPassword}
               required
-              minLength={6}
-              className={input}
-              placeholder="••••••••"
+              autoComplete="new-password"
             />
           </FormField>
 

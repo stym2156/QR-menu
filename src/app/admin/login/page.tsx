@@ -10,6 +10,7 @@ import {
   cardPad,
   input,
 } from "@/components/ui";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -86,14 +87,11 @@ export default function AdminLoginPage() {
           </FormField>
 
           <FormField label="รหัสผ่าน">
-            <input
-              type="password"
+            <PasswordInput
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={setPassword}
               required
               autoComplete="current-password"
-              className={input}
-              placeholder="••••••••"
             />
           </FormField>
 

@@ -13,6 +13,7 @@ import {
   input,
 } from "@/components/ui";
 import { useToast } from "@/components/toast";
+import { PasswordInput } from "@/components/PasswordInput";
 import { compressImage } from "@/lib/image";
 import { randomId } from "@/lib/uuid";
 import { useT } from "@/lib/i18n/I18nProvider";
@@ -355,36 +356,28 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
         />
 
         <FormField label={t("set.pw.current")}>
-          <input
-            type="password"
+          <PasswordInput
             value={currentPw}
-            onChange={(e) => setCurrentPw(e.target.value)}
+            onChange={setCurrentPw}
             required
-            className={input}
             autoComplete="current-password"
           />
         </FormField>
 
         <FormField label={t("set.pw.new")} hint={t("set.pw.new.hint")}>
-          <input
-            type="password"
+          <PasswordInput
             value={newPw}
-            onChange={(e) => setNewPw(e.target.value)}
+            onChange={setNewPw}
             required
-            minLength={6}
-            className={input}
             autoComplete="new-password"
           />
         </FormField>
 
         <FormField label={t("set.pw.confirm")}>
-          <input
-            type="password"
+          <PasswordInput
             value={confirmPw}
-            onChange={(e) => setConfirmPw(e.target.value)}
+            onChange={setConfirmPw}
             required
-            minLength={6}
-            className={input}
             autoComplete="new-password"
           />
         </FormField>

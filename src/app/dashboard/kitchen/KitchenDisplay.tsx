@@ -179,14 +179,37 @@ export default function KitchenDisplay({
     }
   }
 
+  // Sort orders so a table's earliest order pulls all that table's other
+  // orders to the same position — keeps a table's tickets clustered, and
+  // tables that ordered earlier appear before tables that ordered later.
+  const sortedOrders = useMemo(() => {
+    const earliestByTable = new Map<string, string>();
+    for (const o of orders) {
+      const cur = earliestByTable.get(o.table_id);
+      if (!cur || o.created_at < cur) {
+        earliestByTable.set(o.table_id, o.created_at);
+      }
+    }
+    return [...orders].sort((a, b) => {
+      const ea = earliestByTable.get(a.table_id) ?? a.created_at;
+      const eb = earliestByTable.get(b.table_id) ?? b.created_at;
+      if (ea !== eb) return ea < eb ? -1 : 1;
+      // Same table — keep chronological within the group.
+      if (a.created_at !== b.created_at) {
+        return a.created_at < b.created_at ? -1 : 1;
+      }
+      return 0;
+    });
+  }, [orders]);
+
   // Pending splits into "ที่ต้องทำ" (not accepted) and "กำลังทำ" (accepted).
-  const pendingNew = orders.filter(
+  const pendingNew = sortedOrders.filter(
     (o) => o.status === "pending" && !o.accepted_at,
   );
-  const pendingAccepted = orders.filter(
+  const pendingAccepted = sortedOrders.filter(
     (o) => o.status === "pending" && !!o.accepted_at,
   );
-  const ready = orders.filter((o) => o.status === "ready");
+  const ready = sortedOrders.filter((o) => o.status === "ready");
 
   return (
     <div className="space-y-5">
