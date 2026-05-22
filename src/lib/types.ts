@@ -78,6 +78,10 @@ export type Order = {
   paid_at: string | null;
   payment_method: PaymentMethod | null;
   cancel_reason: string | null;
+  accepted_at: string | null;
+  accepted_by: string | null;
+  completed_at: string | null;
+  completed_by: string | null;
   created_at: string;
 };
 

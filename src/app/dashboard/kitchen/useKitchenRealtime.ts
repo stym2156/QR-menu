@@ -2,27 +2,27 @@
 
 import { useEffect } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CallStaffRequest, Order } from "@/lib/types";
+import type { Order } from "@/lib/types";
 
 interface UseKitchenRealtimeOptions {
   supabase: SupabaseClient;
   restaurantId: string;
   setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
-  setCalls: React.Dispatch<React.SetStateAction<CallStaffRequest[]>>;
+  setHistory: React.Dispatch<React.SetStateAction<Order[]>>;
 }
 
 /**
- * Local realtime subscription for the kitchen page — keeps the on-screen order
- * and call-staff lists in sync. Sound notifications are handled globally by
- * `SoundProvider`, so this hook intentionally does NOT play any chime.
+ * Realtime subscription for the kitchen page — keeps the active and history
+ * lists in sync. Call-staff requests now live on the bills page; cooks no
+ * longer get those notifications. Sound is handled globally by SoundProvider.
  *
- * Orders that move to `served` or `cancelled` are removed from kitchen view.
+ * Orders moving to `served` or `cancelled` slide into the history list.
  */
 export function useKitchenRealtime({
   supabase,
   restaurantId,
   setOrders,
-  setCalls,
+  setHistory,
 }: UseKitchenRealtimeOptions): void {
   useEffect(() => {
     const channel = supabase
@@ -37,7 +37,6 @@ export function useKitchenRealtime({
         },
         (payload) => {
           const next = payload.new as Order;
-          // Only surface active orders in the kitchen
           if (next.status === "pending" || next.status === "ready") {
             setOrders((prev) => [...prev, next]);
           }
@@ -53,13 +52,23 @@ export function useKitchenRealtime({
         },
         (payload) => {
           const next = payload.new as Order;
+          const isHistory =
+            next.status === "served" || next.status === "cancelled";
+
           setOrders((prev) => {
-            // Remove from kitchen once it leaves the active states
-            if (next.status === "served" || next.status === "cancelled") {
-              return prev.filter((o) => o.id !== next.id);
-            }
-            return prev.map((o) => (o.id === next.id ? next : o));
+            if (isHistory) return prev.filter((o) => o.id !== next.id);
+            const exists = prev.some((o) => o.id === next.id);
+            if (exists) return prev.map((o) => (o.id === next.id ? next : o));
+            return [...prev, next];
           });
+
+          if (isHistory) {
+            setHistory((prev) => {
+              const exists = prev.some((o) => o.id === next.id);
+              if (exists) return prev.map((o) => (o.id === next.id ? next : o));
+              return [next, ...prev];
+            });
+          }
         },
       )
       .on(
@@ -73,35 +82,7 @@ export function useKitchenRealtime({
         (payload) => {
           const old = payload.old as { id: string };
           setOrders((prev) => prev.filter((o) => o.id !== old.id));
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "call_staff_requests",
-          filter: `restaurant_id=eq.${restaurantId}`,
-        },
-        (payload) => {
-          setCalls((prev) => [...prev, payload.new as CallStaffRequest]);
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "call_staff_requests",
-          filter: `restaurant_id=eq.${restaurantId}`,
-        },
-        (payload) => {
-          const next = payload.new as CallStaffRequest;
-          setCalls((prev) =>
-            next.acknowledged
-              ? prev.filter((c) => c.id !== next.id)
-              : prev.map((c) => (c.id === next.id ? next : c)),
-          );
+          setHistory((prev) => prev.filter((o) => o.id !== old.id));
         },
       )
       .subscribe();
@@ -109,5 +90,5 @@ export function useKitchenRealtime({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [supabase, restaurantId, setOrders, setCalls]);
+  }, [supabase, restaurantId, setOrders, setHistory]);
 }

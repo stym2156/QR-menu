@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { canSeeBills, getCurrentMembership } from "@/lib/membership";
 import BillsView from "./BillsView";
 import I18nPageHeader from "@/components/I18nPageHeader";
-import type { DiningTable, Menu, Order } from "@/lib/types";
+import type { CallStaffRequest, DiningTable, Menu, Order } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +42,7 @@ export default async function BillsPage() {
     { data: settledOrders },
     { data: tables },
     { data: menus },
+    { data: calls },
   ] = await Promise.all([
     supabase
       .from("orders")
@@ -63,6 +64,12 @@ export default async function BillsPage() {
       .eq("restaurant_id", restaurant.id)
       .order("table_number", { ascending: true }),
     supabase.from("menus").select("*").eq("restaurant_id", restaurant.id),
+    supabase
+      .from("call_staff_requests")
+      .select("*")
+      .eq("restaurant_id", restaurant.id)
+      .eq("acknowledged", false)
+      .order("created_at", { ascending: true }),
   ]);
 
   return (
@@ -78,6 +85,7 @@ export default async function BillsPage() {
         initialSettledOrders={(settledOrders ?? []) as Order[]}
         tables={(tables ?? []) as DiningTable[]}
         menus={(menus ?? []) as Menu[]}
+        initialCalls={(calls ?? []) as CallStaffRequest[]}
       />
     </div>
   );

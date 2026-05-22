@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
-import NoShopMessage from "@/components/NoShopMessage";
 import { createClient } from "@/lib/supabase/server";
 import { canSeeKitchen, getCurrentMembership } from "@/lib/membership";
 import KitchenDisplay from "./KitchenDisplay";
 import I18nPageHeader from "@/components/I18nPageHeader";
-import type { CallStaffRequest, DiningTable, Menu, Order } from "@/lib/types";
+import type { DiningTable, Menu, Order } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -23,23 +22,40 @@ export default async function KitchenPage() {
   if (!canSeeKitchen(membership.role)) redirect("/dashboard");
   const restaurant = { id: membership.restaurantId };
 
-  const [{ data: orders }, { data: menus }, { data: tables }, { data: calls }] =
-    await Promise.all([
-      supabase
-        .from("orders")
-        .select("*")
-        .eq("restaurant_id", restaurant.id)
-        .in("status", ["pending", "ready"])
-        .order("created_at", { ascending: true }),
-      supabase.from("menus").select("*").eq("restaurant_id", restaurant.id),
-      supabase.from("tables").select("*").eq("restaurant_id", restaurant.id),
-      supabase
-        .from("call_staff_requests")
-        .select("*")
-        .eq("restaurant_id", restaurant.id)
-        .eq("acknowledged", false)
-        .order("created_at", { ascending: true }),
-    ]);
+  // Pull 7-day completion history window. Older than that lives on /stats.
+  const since = new Date();
+  since.setDate(since.getDate() - 7);
+
+  const [
+    { data: orders },
+    { data: history },
+    { data: menus },
+    { data: tables },
+    { data: members },
+  ] = await Promise.all([
+    supabase
+      .from("orders")
+      .select("*")
+      .eq("restaurant_id", restaurant.id)
+      .in("status", ["pending", "ready"])
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("orders")
+      .select("*")
+      .eq("restaurant_id", restaurant.id)
+      .in("status", ["served", "cancelled"])
+      .gte("completed_at", since.toISOString())
+      .order("completed_at", { ascending: false })
+      .limit(100),
+    supabase.from("menus").select("*").eq("restaurant_id", restaurant.id),
+    supabase.from("tables").select("*").eq("restaurant_id", restaurant.id),
+    supabase.rpc("lookup_member_emails", { rid: restaurant.id }),
+  ]);
+
+  const memberEmails: Record<string, string> = {};
+  for (const m of (members ?? []) as Array<{ user_id: string; email: string }>) {
+    memberEmails[m.user_id] = m.email;
+  }
 
   return (
     <div>
@@ -47,9 +63,10 @@ export default async function KitchenPage() {
       <KitchenDisplay
         restaurantId={restaurant.id}
         initialOrders={(orders ?? []) as Order[]}
-        initialCalls={(calls ?? []) as CallStaffRequest[]}
+        initialHistory={(history ?? []) as Order[]}
         menus={(menus ?? []) as Menu[]}
         tables={(tables ?? []) as DiningTable[]}
+        memberEmails={memberEmails}
       />
     </div>
   );

@@ -10,6 +10,7 @@ import { printReceipt } from "./receipt";
 import { BillModal, type BillGroup } from "./BillModal";
 import SettledBills from "./SettledBills";
 import type {
+  CallStaffRequest,
   DiningTable,
   Menu,
   Order,
@@ -28,6 +29,7 @@ interface Props {
   initialSettledOrders: Order[];
   tables: DiningTable[];
   menus: Menu[];
+  initialCalls: CallStaffRequest[];
 }
 
 export default function BillsView({
@@ -40,12 +42,14 @@ export default function BillsView({
   initialSettledOrders,
   tables,
   menus,
+  initialCalls,
 }: Props) {
   const supabase = createClient();
   const toast = useToast();
   const { t, locale } = useT();
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [settledOrders, setSettledOrders] = useState<Order[]>(initialSettledOrders);
+  const [calls, setCalls] = useState<CallStaffRequest[]>(initialCalls);
   const [tab, setTab] = useState<Tab>("unpaid");
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [lastSettled, setLastSettled] = useState<{
@@ -144,12 +148,56 @@ export default function BillsView({
           setOrders((prev) => prev.filter((o) => o.id !== old.id));
         },
       )
+      // Staff calls (เรียกพนักงาน) — moved from kitchen page here so waiters /
+      // owners on the bills view see them, not cooks who can't act on them.
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "call_staff_requests",
+          filter: `restaurant_id=eq.${restaurantId}`,
+        },
+        (payload) => {
+          setCalls((prev) => [...prev, payload.new as CallStaffRequest]);
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "call_staff_requests",
+          filter: `restaurant_id=eq.${restaurantId}`,
+        },
+        (payload) => {
+          const next = payload.new as CallStaffRequest;
+          setCalls((prev) =>
+            next.acknowledged
+              ? prev.filter((c) => c.id !== next.id)
+              : prev.map((c) => (c.id === next.id ? next : c)),
+          );
+        },
+      )
       .subscribe();
 
     return () => {
       void supabase.removeChannel(channel);
     };
   }, [restaurantId, supabase]);
+
+  async function ackCall(call: CallStaffRequest): Promise<void> {
+    setCalls((prev) => prev.filter((c) => c.id !== call.id));
+    const { error } = await supabase
+      .from("call_staff_requests")
+      .update({ acknowledged: true })
+      .eq("id", call.id);
+    if (error) {
+      toast.error(t("kit.ack_failed", { error: error.message }));
+      // Restore if update failed
+      setCalls((prev) => [...prev, call]);
+    }
+  }
 
   async function settleBill(tableId: string, method: PaymentMethod): Promise<void> {
     const now = new Date().toISOString();
@@ -226,6 +274,45 @@ export default function BillsView({
 
   return (
     <>
+      {calls.length > 0 && (
+        <section className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-900">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-200 text-xs">
+              🔔
+            </span>
+            {t("kit.calls.section", { n: calls.length })}
+          </div>
+          <ul className="space-y-1.5">
+            {calls.map((call) => (
+              <li
+                key={call.id}
+                className="flex items-center justify-between gap-3 rounded-lg bg-surface px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-ink">
+                    {t("kit.calls.table_n", {
+                      n: tableMap.get(call.table_id)?.table_number ?? "?",
+                    })}
+                    <span className="ml-2 text-xs font-normal text-muted">
+                      {formatTime(call.created_at)}
+                    </span>
+                  </div>
+                  <div className="truncate text-xs text-muted">
+                    {call.reason || t("kit.calls.unknown")}
+                  </div>
+                </div>
+                <button
+                  onClick={() => ackCall(call)}
+                  className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-surface hover:bg-emerald-700"
+                >
+                  {t("kit.calls.ack")}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {lastSettled && lastSettled.table ? (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
           <div className="text-sm text-emerald-900">

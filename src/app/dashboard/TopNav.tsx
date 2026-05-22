@@ -11,7 +11,7 @@ type Role = RestaurantRole;
 // Maps an item href → which badge count (from useNavBadges) to render on it.
 const BADGE_KEY: Record<string, keyof NavBadges | undefined> = {
   "/dashboard/kitchen": "kitchen",
-  "/dashboard/bills": "unpaidTables",
+  "/dashboard/bills": "bills",
 };
 
 interface NavItem {
