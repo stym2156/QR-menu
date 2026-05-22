@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import NoShopMessage from "@/components/NoShopMessage";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentMembership, isOwner } from "@/lib/membership";
+import { canSeeMenu, getCurrentMembership, isOwner } from "@/lib/membership";
 import MenuManager from "./MenuManager";
 import MenuPageHeaderClient from "./MenuPageHeaderClient";
 import type { Category, Menu } from "@/lib/types";
@@ -20,7 +20,7 @@ export default async function MenuPage() {
   if (!membership) {
     return <p className="text-muted">ยังไม่มีร้าน — กรุณา signup ใหม่</p>;
   }
-  if (!isOwner(membership.role)) redirect("/dashboard");
+  if (!canSeeMenu(membership.role)) redirect("/dashboard");
 
   const [{ data: menus }, { data: categories }] = await Promise.all([
     supabase
@@ -42,6 +42,7 @@ export default async function MenuPage() {
         restaurantId={membership.restaurantId}
         initialMenus={(menus ?? []) as Menu[]}
         categories={(categories ?? []) as Category[]}
+        canAct={isOwner(membership.role)}
       />
     </div>
   );

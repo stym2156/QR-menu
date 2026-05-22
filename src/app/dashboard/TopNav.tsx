@@ -40,6 +40,7 @@ const NAV: NavItem[] = [
   {
     href: "/dashboard/menu",
     labelKey: "nav.menu",
+    allowedRoles: ["owner", "cook", "waiter", "staff"],
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path
@@ -66,7 +67,7 @@ const NAV: NavItem[] = [
   {
     href: "/dashboard/tables",
     labelKey: "nav.tables",
-    allowedRoles: ["owner", "waiter"],
+    allowedRoles: ["owner", "cook", "waiter"],
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path
@@ -80,7 +81,7 @@ const NAV: NavItem[] = [
   {
     href: "/dashboard/kitchen",
     labelKey: "nav.kitchen",
-    allowedRoles: ["owner", "cook", "staff"],
+    allowedRoles: ["owner", "cook", "waiter", "staff"],
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path
@@ -94,7 +95,7 @@ const NAV: NavItem[] = [
   {
     href: "/dashboard/bills",
     labelKey: "nav.bills",
-    allowedRoles: ["owner", "waiter", "staff"],
+    allowedRoles: ["owner", "cook", "waiter", "staff"],
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path

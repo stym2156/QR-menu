@@ -30,6 +30,7 @@ interface Props {
   tables: DiningTable[];
   menus: Menu[];
   initialCalls: CallStaffRequest[];
+  canAct: boolean;
 }
 
 export default function BillsView({
@@ -43,6 +44,7 @@ export default function BillsView({
   tables,
   menus,
   initialCalls,
+  canAct,
 }: Props) {
   const supabase = createClient();
   const toast = useToast();
@@ -301,12 +303,14 @@ export default function BillsView({
                     {call.reason || t("kit.calls.unknown")}
                   </div>
                 </div>
-                <button
-                  onClick={() => ackCall(call)}
-                  className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-surface hover:bg-emerald-700"
-                >
-                  {t("kit.calls.ack")}
-                </button>
+                {canAct ? (
+                  <button
+                    onClick={() => ackCall(call)}
+                    className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-surface hover:bg-emerald-700"
+                  >
+                    {t("kit.calls.ack")}
+                  </button>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -377,11 +381,19 @@ export default function BillsView({
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {byTable.map((group) => (
+              {byTable.map((group) => {
+                const pendingServe = group.orders.filter(
+                  (o) => o.status !== "served" && o.status !== "cancelled",
+                ).length;
+                return (
                 <button
                   key={group.tableId}
                   onClick={() => setSelectedTableId(group.tableId)}
-                  className="group rounded-2xl border border-line bg-surface p-5 text-left transition hover:border-ink/30 hover:shadow-card"
+                  className={`group rounded-2xl border bg-surface p-5 text-left transition hover:shadow-card ${
+                    pendingServe > 0
+                      ? "border-amber-200 hover:border-amber-300"
+                      : "border-line hover:border-ink/30"
+                  }`}
                 >
                   <div className="flex items-baseline justify-between">
                     <div className="flex items-center gap-2">
@@ -400,11 +412,18 @@ export default function BillsView({
                   <div className="mt-4 text-2xl font-semibold tabular-nums tracking-tight text-ink">
                     {formatKIP(group.total)}
                   </div>
-                  <div className="mt-1 text-xs font-medium text-muted transition group-hover:text-ink">
-                    {t("bill.unpaid.settle_cta")}
-                  </div>
+                  {pendingServe > 0 ? (
+                    <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                      ⏳ {t("bill.unpaid.pending_serve", { n: pendingServe })}
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-xs font-medium text-muted transition group-hover:text-ink">
+                      {t("bill.unpaid.settle_cta")}
+                    </div>
+                  )}
                 </button>
-              ))}
+                );
+              })}
             </div>
           </>
         )
@@ -426,6 +445,7 @@ export default function BillsView({
           menuMap={menuMap}
           serviceChargePct={serviceChargePct}
           vatPct={vatPct}
+          canAct={canAct}
           onClose={() => setSelectedTableId(null)}
           onSettle={async (method) => {
             await settleBill(selectedGroup.tableId, method);

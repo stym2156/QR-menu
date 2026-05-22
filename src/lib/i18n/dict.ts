@@ -412,6 +412,9 @@ export const DICTIONARIES: Record<Locale, Dict> = {
     // bills view
     "bill.unpaid.total": "ยอดค้างชำระทั้งหมด",
     "bill.unpaid.empty.title": "ยังไม่มีโต๊ะที่ค้างบิล",
+    "bill.unpaid.pending_serve": "รอเสิร์ฟ {n} รายการ",
+    "bill.modal.cant_settle_yet": "รอครัวเสิร์ฟครบก่อน ยังเช็คบิลไม่ได้ ({n} รายการ)",
+    "bill.modal.read_only": "ดูได้อย่างเดียว — เฉพาะเจ้าของหรือพนักงานเสิร์ฟเท่านั้นที่เช็คบิลได้",
     "bill.unpaid.empty.desc": "เมื่อมีลูกค้าสั่งอาหาร โต๊ะจะปรากฏที่นี่",
     "bill.unpaid.orders_n": "{n} ออเดอร์",
     "bill.unpaid.items_n": "{n} รายการ",
@@ -1040,6 +1043,9 @@ export const DICTIONARIES: Record<Locale, Dict> = {
 
     "bill.unpaid.total": "ຍອດຄ້າງຊຳລະທັງໝົດ",
     "bill.unpaid.empty.title": "ຍັງບໍ່ມີໂຕະທີ່ຄ້າງບິນ",
+    "bill.unpaid.pending_serve": "ລໍເສີບ {n} ລາຍການ",
+    "bill.modal.cant_settle_yet": "ລໍຄົວເສີບໃຫ້ຄົບກ່ອນ ຍັງເຊັກບິນບໍ່ໄດ້ ({n} ລາຍການ)",
+    "bill.modal.read_only": "ເບິ່ງໄດ້ຢ່າງດຽວ — ສະເພາະເຈົ້າຂອງ ຫຼື ພະນັກງານເສີບເທົ່ານັ້ນທີ່ເຊັກບິນໄດ້",
     "bill.unpaid.empty.desc": "ເມື່ອມີລູກຄ້າສັ່ງອາຫານ ໂຕະຈະປະກົດທີ່ນີ້",
     "bill.unpaid.orders_n": "{n} ອໍເດີ",
     "bill.unpaid.items_n": "{n} ລາຍການ",
@@ -1659,6 +1665,9 @@ export const DICTIONARIES: Record<Locale, Dict> = {
 
     "bill.unpaid.total": "Total outstanding",
     "bill.unpaid.empty.title": "No unpaid tables",
+    "bill.unpaid.pending_serve": "{n} not served yet",
+    "bill.modal.cant_settle_yet": "Wait for the kitchen to serve all items first ({n} pending)",
+    "bill.modal.read_only": "View only — only owners or waiters can settle bills",
     "bill.unpaid.empty.desc": "When customers order, tables will appear here",
     "bill.unpaid.orders_n": "{n} orders",
     "bill.unpaid.items_n": "{n} items",

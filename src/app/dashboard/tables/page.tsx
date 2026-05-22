@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import NoShopMessage from "@/components/NoShopMessage";
 import { createClient } from "@/lib/supabase/server";
 import {
+  canActTables,
   canManageTables,
   canSeeTables,
   getCurrentMembership,
@@ -46,6 +47,7 @@ export default async function TablesPage() {
         restaurantId={membership.restaurantId}
         initialTables={(tables ?? []) as DiningTable[]}
         canManage={canManageTables(membership.role)}
+        canAct={canActTables(membership.role)}
       />
     </div>
   );

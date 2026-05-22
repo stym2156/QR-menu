@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { canSeeKitchen, getCurrentMembership } from "@/lib/membership";
+import { canActKitchen, canSeeKitchen, getCurrentMembership } from "@/lib/membership";
 import KitchenDisplay from "./KitchenDisplay";
 import I18nPageHeader from "@/components/I18nPageHeader";
 import type { DiningTable, Menu, Order } from "@/lib/types";
@@ -67,6 +67,7 @@ export default async function KitchenPage() {
         menus={(menus ?? []) as Menu[]}
         tables={(tables ?? []) as DiningTable[]}
         memberEmails={memberEmails}
+        canAct={canActKitchen(membership.role)}
       />
     </div>
   );

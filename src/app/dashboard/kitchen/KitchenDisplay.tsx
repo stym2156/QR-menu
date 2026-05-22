@@ -18,6 +18,7 @@ interface Props {
   menus: Menu[];
   tables: DiningTable[];
   memberEmails: Record<string, string>;
+  canAct: boolean;
 }
 
 type KitchenTab = "active" | "history";
@@ -29,6 +30,7 @@ export default function KitchenDisplay({
   menus,
   tables,
   memberEmails,
+  canAct,
 }: Props) {
   const supabase = createClient();
   const toast = useToast();
@@ -241,24 +243,28 @@ export default function KitchenDisplay({
             menuMap={menuMap}
             tableMap={tableMap}
             locale={locale}
-            actions={(o) => (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setCancelTarget(o)}
-                  disabled={busyId === o.id}
-                  className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-muted transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                >
-                  {t("kit.cancel")}
-                </button>
-                <button
-                  onClick={() => acceptOrder(o)}
-                  disabled={busyId === o.id}
-                  className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-surface shadow-card transition hover:bg-sky-700 disabled:opacity-60"
-                >
-                  {t("kit.accept_arrow")}
-                </button>
-              </div>
-            )}
+            actions={
+              canAct
+                ? (o) => (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setCancelTarget(o)}
+                        disabled={busyId === o.id}
+                        className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-muted transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                      >
+                        {t("kit.cancel")}
+                      </button>
+                      <button
+                        onClick={() => acceptOrder(o)}
+                        disabled={busyId === o.id}
+                        className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-surface shadow-card transition hover:bg-sky-700 disabled:opacity-60"
+                      >
+                        {t("kit.accept_arrow")}
+                      </button>
+                    </div>
+                  )
+                : null
+            }
           />
           <Column
             title={t("kit.col.in_progress")}
@@ -270,24 +276,28 @@ export default function KitchenDisplay({
             locale={locale}
             memberEmails={memberEmails}
             showAcceptedBy
-            actions={(o) => (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setCancelTarget(o)}
-                  disabled={busyId === o.id}
-                  className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-muted transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                >
-                  {t("kit.cancel")}
-                </button>
-                <button
-                  onClick={() => markReady(o)}
-                  disabled={busyId === o.id}
-                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-surface shadow-card transition hover:bg-emerald-700 disabled:opacity-60"
-                >
-                  {t("kit.done_arrow")}
-                </button>
-              </div>
-            )}
+            actions={
+              canAct
+                ? (o) => (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setCancelTarget(o)}
+                        disabled={busyId === o.id}
+                        className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-muted transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                      >
+                        {t("kit.cancel")}
+                      </button>
+                      <button
+                        onClick={() => markReady(o)}
+                        disabled={busyId === o.id}
+                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-surface shadow-card transition hover:bg-emerald-700 disabled:opacity-60"
+                      >
+                        {t("kit.done_arrow")}
+                      </button>
+                    </div>
+                  )
+                : null
+            }
           />
           <Column
             title={t("kit.ready")}
@@ -299,15 +309,19 @@ export default function KitchenDisplay({
             locale={locale}
             memberEmails={memberEmails}
             showCompletedBy
-            actions={(o) => (
-              <button
-                onClick={() => markServed(o)}
-                disabled={busyId === o.id}
-                className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-surface shadow-card transition hover:bg-ink/85 disabled:opacity-60"
-              >
-                {t("kit.served_check")}
-              </button>
-            )}
+            actions={
+              canAct
+                ? (o) => (
+                    <button
+                      onClick={() => markServed(o)}
+                      disabled={busyId === o.id}
+                      className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-surface shadow-card transition hover:bg-ink/85 disabled:opacity-60"
+                    >
+                      {t("kit.served_check")}
+                    </button>
+                  )
+                : null
+            }
           />
         </div>
       ) : (
@@ -369,7 +383,8 @@ interface ColumnProps {
   menuMap: Map<string, Menu>;
   tableMap: Map<string, DiningTable>;
   locale: ReturnType<typeof useT>["locale"];
-  actions: (o: Order) => React.ReactNode;
+  // null = read-only column (no buttons rendered)
+  actions: ((o: Order) => React.ReactNode) | null;
   memberEmails?: Record<string, string>;
   showAcceptedBy?: boolean;
   showCompletedBy?: boolean;
@@ -469,7 +484,9 @@ function Column({
                   })}
                 </p>
               ) : null}
-              <div className="flex justify-end">{actions(order)}</div>
+              {actions ? (
+                <div className="flex justify-end">{actions(order)}</div>
+              ) : null}
             </li>
           ))}
         </ul>

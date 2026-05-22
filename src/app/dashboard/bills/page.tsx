@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import NoShopMessage from "@/components/NoShopMessage";
 import { createClient } from "@/lib/supabase/server";
-import { canSeeBills, getCurrentMembership } from "@/lib/membership";
+import { canActBills, canSeeBills, getCurrentMembership } from "@/lib/membership";
 import BillsView from "./BillsView";
 import I18nPageHeader from "@/components/I18nPageHeader";
 import type { CallStaffRequest, DiningTable, Menu, Order } from "@/lib/types";
@@ -86,6 +86,7 @@ export default async function BillsPage() {
         tables={(tables ?? []) as DiningTable[]}
         menus={(menus ?? []) as Menu[]}
         initialCalls={(calls ?? []) as CallStaffRequest[]}
+        canAct={canActBills(membership.role)}
       />
     </div>
   );

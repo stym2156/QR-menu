@@ -29,6 +29,7 @@ interface BillModalProps {
   menuMap: Map<string, Menu>;
   serviceChargePct: number;
   vatPct: number;
+  canAct: boolean;
   onClose: () => void;
   onSettle: (method: PaymentMethod) => Promise<void>;
 }
@@ -38,6 +39,7 @@ export function BillModal({
   menuMap,
   serviceChargePct,
   vatPct,
+  canAct,
   onClose,
   onSettle,
 }: BillModalProps) {
@@ -45,6 +47,14 @@ export function BillModal({
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [busy, setBusy] = useState(false);
   const bill = calculateBill(group.total, serviceChargePct, vatPct);
+
+  // Block settle until the kitchen has marked every (non-cancelled) order
+  // as served. Cancelled orders are excluded from the count because they
+  // don't need to be served.
+  const pendingServeCount = group.orders.filter(
+    (o) => o.status !== "served" && o.status !== "cancelled",
+  ).length;
+  const canSettle = canAct && pendingServeCount === 0;
 
   async function handleSettle(): Promise<void> {
     setBusy(true);
@@ -163,9 +173,19 @@ export function BillModal({
             </div>
           </div>
 
+          {!canAct ? (
+            <p className="mt-4 rounded-xl border border-line bg-canvas/50 px-3 py-2 text-xs text-muted">
+              {t("bill.modal.read_only")}
+            </p>
+          ) : pendingServeCount > 0 ? (
+            <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              {t("bill.modal.cant_settle_yet", { n: pendingServeCount })}
+            </p>
+          ) : null}
+
           <button
             onClick={handleSettle}
-            disabled={busy}
+            disabled={busy || !canSettle}
             className={`${buttonPrimary} mt-6 w-full py-3.5 text-base`}
           >
             {busy

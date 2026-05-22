@@ -22,13 +22,17 @@ import type { DiningTable } from "@/lib/types";
 interface Props {
   restaurantId: string;
   initialTables: DiningTable[];
+  // Owner only — controls add + delete UI.
   canManage: boolean;
+  // Owner + waiter — controls open/close toggle. Cook gets read-only.
+  canAct: boolean;
 }
 
 export default function TableManager({
   restaurantId,
   initialTables,
   canManage,
+  canAct,
 }: Props) {
   const supabase = createClient();
   const confirm = useConfirm();
@@ -231,6 +235,7 @@ export default function TableManager({
                     restaurantId={restaurantId}
                     origin={origin}
                     canManage={canManage}
+                    canAct={canAct}
                     onDelete={() => deleteTable(table)}
                     onDownload={() => downloadQR(table)}
                     onToggleOpen={() => toggleOpen(table)}
@@ -250,6 +255,7 @@ interface TableCardProps {
   restaurantId: string;
   origin: string;
   canManage: boolean;
+  canAct: boolean;
   onDelete: () => void;
   onDownload: () => void;
   onToggleOpen: () => void;
@@ -260,6 +266,7 @@ function TableCard({
   restaurantId,
   origin,
   canManage,
+  canAct,
   onDelete,
   onDownload,
   onToggleOpen,
@@ -317,16 +324,18 @@ function TableCard({
         ) : null}
       </div>
 
-      <button
-        onClick={onToggleOpen}
-        className={`mb-3 w-full rounded-xl px-3 py-2 text-xs font-medium transition active:scale-[0.98] ${
-          table.is_open
-            ? "border border-line bg-surface text-ink hover:bg-canvas"
-            : "bg-ink text-surface shadow-ink hover:bg-ink/85"
-        }`}
-      >
-        {table.is_open ? t("mgr.tbl.close_btn") : t("mgr.tbl.open_btn")}
-      </button>
+      {canAct ? (
+        <button
+          onClick={onToggleOpen}
+          className={`mb-3 w-full rounded-xl px-3 py-2 text-xs font-medium transition active:scale-[0.98] ${
+            table.is_open
+              ? "border border-line bg-surface text-ink hover:bg-canvas"
+              : "bg-ink text-surface shadow-ink hover:bg-ink/85"
+          }`}
+        >
+          {table.is_open ? t("mgr.tbl.close_btn") : t("mgr.tbl.open_btn")}
+        </button>
+      ) : null}
 
       <div className="flex gap-3">
         <div className="h-28 w-28 shrink-0 overflow-hidden rounded-xl border border-line bg-canvas p-1.5">

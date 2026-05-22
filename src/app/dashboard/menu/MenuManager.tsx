@@ -26,12 +26,15 @@ interface Props {
   restaurantId: string;
   initialMenus: Menu[];
   categories: Category[];
+  // Owner-only edit controls. Waiter/cook see the list read-only.
+  canAct: boolean;
 }
 
 export default function MenuManager({
   restaurantId,
   initialMenus,
   categories: initialCategories,
+  canAct,
 }: Props) {
   const supabase = createClient();
   const confirm = useConfirm();
@@ -277,8 +280,13 @@ export default function MenuManager({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[380px_1fr] max-w-7xl mx-auto px-4 py-6">
-      {/* ฝั่งซ้าย: ฟอร์มเพิ่มเมนู */}
+    <div
+      className={`grid grid-cols-1 gap-8 max-w-7xl mx-auto px-4 py-6 ${
+        canAct ? "lg:grid-cols-[380px_1fr]" : ""
+      }`}
+    >
+      {/* ฝั่งซ้าย: ฟอร์มเพิ่มเมนู — เฉพาะ owner เท่านั้น */}
+      {canAct ? (
       <div className="lg:sticky lg:top-24 h-fit">
         <form onSubmit={handleAdd} className={`${card} ${cardPad} shadow-sm border border-line/60 rounded-2xl bg-surface space-y-5 relative overflow-hidden`}>
           <div className="border-b border-line pb-4 mb-2">
@@ -387,6 +395,7 @@ export default function MenuManager({
           </button>
         </form>
       </div>
+      ) : null}
 
       {/* ฝั่งขวา: รายการเมนู */}
       <div className="space-y-4">
@@ -493,33 +502,59 @@ export default function MenuManager({
 
                     {/* รายละเอียดเมนู */}
                     <div className="min-w-0 flex-1 space-y-1">
-                      <button
-                        type="button"
-                        onClick={() => setNameEditingId(menu.id)}
-                        className={`group/name flex w-full min-w-0 items-center gap-1.5 truncate text-left text-sm font-semibold tracking-tight transition hover:text-accent-600 ${!isAvailable ? "text-muted line-through" : "text-ink"}`}
-                        aria-label={t("common.edit")}
-                      >
-                        <span className="truncate">{pickName(menu, locale)}</span>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3 w-3 shrink-0 opacity-0 transition group-hover/name:opacity-60">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487a2.06 2.06 0 1 1 2.915 2.914L7.5 19.673 3 21l1.327-4.5L16.862 4.487Z" />
-                        </svg>
-                      </button>
+                      {canAct ? (
+                        <button
+                          type="button"
+                          onClick={() => setNameEditingId(menu.id)}
+                          className={`group/name flex w-full min-w-0 items-center gap-1.5 truncate text-left text-sm font-semibold tracking-tight transition hover:text-accent-600 ${!isAvailable ? "text-muted line-through" : "text-ink"}`}
+                          aria-label={t("common.edit")}
+                        >
+                          <span className="truncate">{pickName(menu, locale)}</span>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3 w-3 shrink-0 opacity-0 transition group-hover/name:opacity-60">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487a2.06 2.06 0 1 1 2.915 2.914L7.5 19.673 3 21l1.327-4.5L16.862 4.487Z" />
+                          </svg>
+                        </button>
+                      ) : (
+                        <div className={`truncate text-sm font-semibold tracking-tight ${!isAvailable ? "text-muted line-through" : "text-ink"}`}>
+                          {pickName(menu, locale)}
+                        </div>
+                      )}
                       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs">
                         <span className={`font-bold tabular-nums ${!isAvailable ? "text-muted" : "text-ink"}`}>
                           {formatKIP(menu.price)}
                         </span>
                         <span className="text-line-vertical border-l border-line h-3" />
-                        <button
-                          type="button"
-                          onClick={() => setCatEditingId(menu.id)}
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium transition hover:ring-1 hover:ring-ink/20 active:scale-95 ${
-                            menu.category_id
-                              ? "bg-canvas text-ink/80 border border-line/40 hover:bg-line/40"
-                              : "bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100"
-                          }`}
-                          aria-label={t("mgr.menu.category")}
-                        >
-                          <span>
+                        {canAct ? (
+                          <button
+                            type="button"
+                            onClick={() => setCatEditingId(menu.id)}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium transition hover:ring-1 hover:ring-ink/20 active:scale-95 ${
+                              menu.category_id
+                                ? "bg-canvas text-ink/80 border border-line/40 hover:bg-line/40"
+                                : "bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100"
+                            }`}
+                            aria-label={t("mgr.menu.category")}
+                          >
+                            <span>
+                              {menu.category_id
+                                ? (() => {
+                                    const c = categoryMap.get(menu.category_id);
+                                    return c ? pickName(c, locale) : t("kit.no_menu");
+                                  })()
+                                : t("combobox.none")}
+                            </span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3 opacity-60">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
+                            </svg>
+                          </button>
+                        ) : (
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium ${
+                              menu.category_id
+                                ? "bg-canvas text-ink/80 border border-line/40"
+                                : "bg-amber-50 text-amber-700 border border-amber-100"
+                            }`}
+                          >
                             {menu.category_id
                               ? (() => {
                                   const c = categoryMap.get(menu.category_id);
@@ -527,38 +562,41 @@ export default function MenuManager({
                                 })()
                               : t("combobox.none")}
                           </span>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3 opacity-60">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
-                          </svg>
-                        </button>
+                        )}
                       </div>
                     </div>
 
-                    {/* สวิตช์เปิด/ปิดการขาย และ ปุ่มลบ */}
-                    <div className="flex items-center gap-2 pl-2 border-l border-line">
-                      <label
-                        className="flex cursor-pointer items-center select-none"
-                        title={isAvailable ? t("mgr.menu.available.on") : t("mgr.menu.available.off")}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isAvailable}
-                          onChange={() => toggleAvailable(menu)}
-                          className="peer sr-only"
-                        />
-                        <span className="relative h-6 w-11 rounded-full bg-line transition-colors duration-200 peer-checked:bg-emerald-500 after:absolute after:left-[3px] after:top-[3px] after:h-[18px] after:w-[18px] after:rounded-full after:bg-white after:shadow-sm after:transition-all after:content-[''] peer-checked:after:translate-x-5" />
-                      </label>
+                    {/* สวิตช์เปิด/ปิดการขาย และ ปุ่มลบ — เฉพาะ owner เท่านั้น */}
+                    {canAct ? (
+                      <div className="flex items-center gap-2 pl-2 border-l border-line">
+                        <label
+                          className="flex cursor-pointer items-center select-none"
+                          title={isAvailable ? t("mgr.menu.available.on") : t("mgr.menu.available.off")}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isAvailable}
+                            onChange={() => toggleAvailable(menu)}
+                            className="peer sr-only"
+                          />
+                          <span className="relative h-6 w-11 rounded-full bg-line transition-colors duration-200 peer-checked:bg-emerald-500 after:absolute after:left-[3px] after:top-[3px] after:h-[18px] after:w-[18px] after:rounded-full after:bg-white after:shadow-sm after:transition-all after:content-[''] peer-checked:after:translate-x-5" />
+                        </label>
 
-                      <button
-                        onClick={() => deleteMenu(menu)}
-                        className="rounded-lg p-2 text-xs font-medium text-muted transition hover:bg-red-50 hover:text-red-600 active:scale-95"
-                        aria-label={t("common.delete")}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                        </svg>
-                      </button>
-                    </div>
+                        <button
+                          onClick={() => deleteMenu(menu)}
+                          className="rounded-lg p-2 text-xs font-medium text-muted transition hover:bg-red-50 hover:text-red-600 active:scale-95"
+                          aria-label={t("common.delete")}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : !isAvailable ? (
+                      <span className="shrink-0 rounded-full bg-muted/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted">
+                        {t("mgr.menu.available.off")}
+                      </span>
+                    ) : null}
                   </div>
                   </li>
                       );
