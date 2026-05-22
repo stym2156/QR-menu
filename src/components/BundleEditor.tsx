@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/lib/i18n/I18nProvider";
 import type { MenuBundle } from "@/lib/types";
 
 interface BundleEditorProps {
@@ -14,6 +15,7 @@ export default function BundleEditor({
   onChange,
   unitPrice,
 }: BundleEditorProps) {
+  const { t } = useT();
   const [label, setLabel] = useState("");
   const [qty, setQty] = useState("");
 
@@ -52,7 +54,7 @@ export default function BundleEditor({
                 type="button"
                 onClick={() => removeBundle(idx)}
                 className="rounded-md px-2 py-1 text-xs text-muted transition hover:bg-red-50 hover:text-red-600"
-                aria-label="ลบชุด"
+                aria-label={t("bundle.remove_aria")}
               >
                 ✕
               </button>
@@ -72,7 +74,7 @@ export default function BundleEditor({
               addBundle();
             }
           }}
-          placeholder="ครึ่งลัง"
+          placeholder={t("bundle.placeholder_label")}
           maxLength={32}
           className="flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted/70 outline-none focus:border-ink/30 focus:ring-2 focus:ring-ink/5"
         />
@@ -87,7 +89,7 @@ export default function BundleEditor({
               addBundle();
             }
           }}
-          placeholder="12"
+          placeholder={t("bundle.placeholder_qty")}
           className="w-20 rounded-lg border border-line bg-surface px-3 py-2 text-sm tabular-nums text-ink placeholder:text-muted/70 outline-none focus:border-ink/30 focus:ring-2 focus:ring-ink/5"
         />
         <button
@@ -100,9 +102,7 @@ export default function BundleEditor({
       </div>
 
       {bundles.length === 0 ? (
-        <p className="text-[11px] text-muted">
-          เช่น &quot;ครึ่งลัง&quot; ×12 หรือ &quot;ลัง&quot; ×24 — ลูกค้ากดปุ่มเดียวสั่งทั้งชุด
-        </p>
+        <p className="text-[11px] text-muted">{t("bundle.hint")}</p>
       ) : null}
     </div>
   );

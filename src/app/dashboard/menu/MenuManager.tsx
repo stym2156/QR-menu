@@ -14,11 +14,13 @@ import {
   input,
 } from "@/components/ui";
 import CategoryCombobox from "@/components/CategoryCombobox";
-import BundleEditor from "@/components/BundleEditor";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/toast";
 import { compressImage } from "@/lib/image";
-import type { Category, Menu, MenuBundle } from "@/lib/types";
+import { randomId } from "@/lib/uuid";
+import { useT } from "@/lib/i18n/I18nProvider";
+import { pickName } from "@/lib/i18n/localized";
+import type { Category, Menu } from "@/lib/types";
 
 interface Props {
   restaurantId: string;
@@ -34,16 +36,18 @@ export default function MenuManager({
   const supabase = createClient();
   const confirm = useConfirm();
   const toast = useToast();
+  const { t, locale } = useT();
   const [menus, setMenus] = useState<Menu[]>(initialMenus);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [name, setName] = useState("");
+  const [nameLo, setNameLo] = useState("");
+  const [nameEn, setNameEn] = useState("");
   const [price, setPrice] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [bundles, setBundles] = useState<MenuBundle[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [bundlesEditingId, setBundlesEditingId] = useState<string | null>(null);
+  const [catEditingId, setCatEditingId] = useState<string | null>(null);
 
   const categoryMap = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
@@ -67,6 +71,15 @@ export default function MenuManager({
   async function handleAdd(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     setError(null);
+
+    const th = name.trim();
+    const lo = nameLo.trim();
+    const en = nameEn.trim();
+    if (!th && !lo && !en) {
+      setError(t("mgr.menu.error.no_name"));
+      return;
+    }
+
     setBusy(true);
 
     let imageUrl: string | null = null;
@@ -74,13 +87,13 @@ export default function MenuManager({
     if (file) {
       const compressed = await compressImage(file).catch(() => file);
       const ext = compressed.name.split(".").pop() ?? "jpg";
-      const path = `${restaurantId}/${crypto.randomUUID()}.${ext}`;
+      const path = `${restaurantId}/${randomId()}.${ext}`;
       const { error: uploadError } = await supabase.storage
         .from("menu-images")
         .upload(path, compressed, { cacheControl: "3600", upsert: false });
 
       if (uploadError) {
-        setError(`อัปโหลดรูปไม่สำเร็จ: ${uploadError.message}`);
+        setError(t("mgr.menu.upload_failed", { error: uploadError.message }));
         setBusy(false);
         return;
       }
@@ -89,40 +102,38 @@ export default function MenuManager({
       imageUrl = publicUrl.publicUrl;
     }
 
+    // `name` is NOT NULL in the schema — fall back to whichever language is filled.
+    const primary = th || lo || en;
     const { data: inserted, error: insertError } = await supabase
       .from("menus")
       .insert({
         restaurant_id: restaurantId,
         category_id: categoryId,
-        name,
+        name: primary,
+        name_lo: lo || null,
+        name_en: en || null,
         price: Number(price),
         image_url: imageUrl,
         available: true,
-        bundles,
+        bundles: [],
       })
       .select()
       .single();
 
     if (insertError || !inserted) {
-      setError(`เพิ่มเมนูไม่สำเร็จ: ${insertError?.message}`);
+      setError(t("mgr.menu.add_failed", { error: insertError?.message ?? "" }));
       setBusy(false);
       return;
     }
 
     setMenus((prev) => [inserted as Menu, ...prev]);
     setName("");
+    setNameLo("");
+    setNameEn("");
     setPrice("");
     setCategoryId(null);
-    setBundles([]);
     setFile(null);
     setBusy(false);
-  }
-
-  async function updateBundles(menu: Menu, next: MenuBundle[]): Promise<void> {
-    setMenus((prev) =>
-      prev.map((m) => (m.id === menu.id ? { ...m, bundles: next } : m)),
-    );
-    await supabase.from("menus").update({ bundles: next }).eq("id", menu.id);
   }
 
   async function toggleAvailable(menu: Menu): Promise<void> {
@@ -142,16 +153,16 @@ export default function MenuManager({
 
   async function deleteMenu(menu: Menu): Promise<void> {
     const ok = await confirm({
-      title: `ลบเมนู "${menu.name}"?`,
-      description: "เมนูจะหายจากร้านทันที ลูกค้าสั่งไม่ได้ การกระทำนี้ย้อนกลับไม่ได้",
-      confirmText: "ลบ",
+      title: t("mgr.menu.delete.title", { name: menu.name }),
+      description: t("mgr.menu.delete.desc"),
+      confirmText: t("common.delete"),
       tone: "danger",
     });
     if (!ok) return;
     setMenus((prev) => prev.filter((m) => m.id !== menu.id));
     const { error } = await supabase.from("menus").delete().eq("id", menu.id);
-    if (error) toast.error(`ลบไม่สำเร็จ: ${error.message}`);
-    else toast.success(`ลบ "${menu.name}" แล้ว`);
+    if (error) toast.error(t("mgr.menu.delete_failed", { error: error.message }));
+    else toast.success(t("mgr.menu.deleted", { name: menu.name }));
   }
 
   return (
@@ -160,21 +171,40 @@ export default function MenuManager({
       <div className="lg:sticky lg:top-24 h-fit">
         <form onSubmit={handleAdd} className={`${card} ${cardPad} shadow-sm border border-line/60 rounded-2xl bg-surface space-y-5 relative overflow-hidden`}>
           <div className="border-b border-line pb-4 mb-2">
-            <SectionHeading title="เพิ่มเมนูใหม่" />
+            <SectionHeading title={t("mgr.menu.add_title")} />
           </div>
 
-          <FormField label="ชื่อเมนู">
+          <FormField label={t("mgr.menu.name_th")} hint={t("mgr.menu.name_th.hint")}>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              required
               className={`${input} focus:ring-2 focus:ring-ink/10 transition-all duration-200`}
-              placeholder="เช่น ผัดไทยกุ้งสด, ชาเขียวนม"
+              placeholder={t("mgr.menu.name_th.placeholder")}
             />
           </FormField>
 
-          <FormField label="ราคา">
+          <FormField label={t("mgr.menu.name_lo")} hint={t("mgr.menu.name_lo.hint")}>
+            <input
+              type="text"
+              value={nameLo}
+              onChange={(e) => setNameLo(e.target.value)}
+              className={`${input} focus:ring-2 focus:ring-ink/10`}
+              placeholder={t("mgr.menu.name_lo.placeholder")}
+            />
+          </FormField>
+
+          <FormField label={t("mgr.menu.name_en")} hint={t("mgr.menu.name_en.hint")}>
+            <input
+              type="text"
+              value={nameEn}
+              onChange={(e) => setNameEn(e.target.value)}
+              className={`${input} focus:ring-2 focus:ring-ink/10`}
+              placeholder={t("mgr.menu.name_en.placeholder")}
+            />
+          </FormField>
+
+          <FormField label={t("mgr.menu.price")}>
             <div className="relative rounded-xl shadow-sm">
               <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-base font-medium text-muted/80">
                 ₭
@@ -192,20 +222,16 @@ export default function MenuManager({
             </div>
           </FormField>
 
-          <FormField
-            label="หมวดหมู่"
-            hint="พิมพ์เพื่อค้นหา หรือสร้างหมวดหมู่ใหม่ได้ทันที"
-          >
+          <FormField label={t("mgr.menu.category")}>
             <CategoryCombobox
               value={categoryId}
               onChange={setCategoryId}
               categories={categories}
               onCreate={createCategoryInline}
-              placeholder="— เลือกหมวดหมู่ —"
             />
           </FormField>
 
-          <FormField label="รูปภาพเมนู" hint="แนะนำรูปอัตราส่วน 1:1 เพื่อการแสดงผลที่สวยงาม">
+          <FormField label={t("mgr.menu.image")}>
             <div className="mt-1 flex justify-center rounded-xl border border-dashed border-line px-4 py-4 hover:bg-canvas/40 transition group cursor-pointer relative">
               <div className="space-y-1 text-center">
                 <svg className="mx-auto h-6 w-6 text-muted group-hover:text-ink transition" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
@@ -213,7 +239,7 @@ export default function MenuManager({
                 </svg>
                 <div className="flex text-xs text-muted justify-center">
                   <span className="relative font-medium text-ink hover:underline">
-                    {file ? file.name : "เลือกอัปโหลดไฟล์รูปภาพ"}
+                    {file ? file.name : t("mgr.menu.image.choose")}
                   </span>
                 </div>
               </div>
@@ -226,17 +252,7 @@ export default function MenuManager({
             </div>
           </FormField>
 
-          <FormField
-            label="ชุดแนะนำ (ไม่บังคับ)"
-            hint="เช่น เครื่องดื่ม → ครึ่งลัง 12, ลัง 24"
-          >
-            <BundleEditor
-              bundles={bundles}
-              onChange={setBundles}
-              unitPrice={Number(price) || 0}
-            />
-          </FormField>
-
+         
           {error ? (
             <div className="rounded-xl bg-red-50 border border-red-100 p-3 text-xs font-medium text-red-600 flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
@@ -252,10 +268,10 @@ export default function MenuManager({
             {busy ? (
               <>
                 <span className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
-                กำลังบันทึก...
+                {t("mgr.menu.submitting")}
               </>
             ) : (
-              "+ เพิ่มเมนูเข้าสู่ระบบ"
+              t("mgr.menu.submit")
             )}
           </button>
         </form>
@@ -266,21 +282,22 @@ export default function MenuManager({
         {menus.length === 0 ? (
           <div className="border border-dashed border-line rounded-2xl bg-surface/50 p-8">
             <EmptyState
-              title="ยังไม่มีรายการเมนูในระบบ"
-              description="เริ่มต้นสร้างเมนูแรกของคุณด้วยการกรอกข้อมูลที่ฟอร์มทางด้านซ้ายมือ"
+              title={t("mgr.menu.empty")}
+              description={t("mgr.menu.empty.desc")}
             />
           </div>
         ) : (
           <>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line pb-4">
-              <SectionHeading title="รายการเมนูทั้งหมด" description={`พบข้อมูลในระบบทั้งหมด ${menus.length} รายการ`} />
+              <SectionHeading
+                title={t("mgr.menu.list_title")}
+                description={t("mgr.menu.list_count", { n: menus.length })}
+              />
             </div>
             
             <ul className="grid grid-cols-1 gap-3">
               {menus.map((menu) => {
                 const isAvailable = menu.available;
-                const isEditingBundles = bundlesEditingId === menu.id;
-                const bundleCount = menu.bundles?.length ?? 0;
                 return (
                   <li
                     key={menu.id}
@@ -300,7 +317,7 @@ export default function MenuManager({
                       {menu.image_url ? (
                         <Image
                           src={menu.image_url}
-                          alt={menu.name}
+                          alt={pickName(menu, locale)}
                           fill
                           sizes="64px"
                           className={`object-contain transition-transform duration-300 hover:scale-105 ${!isAvailable && "grayscale"}`}
@@ -315,74 +332,43 @@ export default function MenuManager({
                     {/* รายละเอียดเมนู */}
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className={`truncate text-sm font-semibold tracking-tight transition ${!isAvailable ? "text-muted line-through" : "text-ink"}`}>
-                        {menu.name}
+                        {pickName(menu, locale)}
                       </div>
                       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs">
                         <span className={`font-bold tabular-nums ${!isAvailable ? "text-muted" : "text-ink"}`}>
                           {formatKIP(menu.price)}
                         </span>
                         <span className="text-line-vertical border-l border-line h-3" />
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium ${
-                          menu.category_id 
-                            ? "bg-canvas text-ink/80 border border-line/40" 
-                            : "bg-amber-50 text-amber-700 border border-amber-100"
-                        }`}>
-                          {menu.category_id
-                            ? (categoryMap.get(menu.category_id)?.name ?? "(หมวดถูกลบ)")
-                            : "ไม่มีหมวดหมู่"}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setCatEditingId(menu.id)}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium transition hover:ring-1 hover:ring-ink/20 active:scale-95 ${
+                            menu.category_id
+                              ? "bg-canvas text-ink/80 border border-line/40 hover:bg-line/40"
+                              : "bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100"
+                          }`}
+                          aria-label={t("mgr.menu.category")}
+                        >
+                          <span>
+                            {menu.category_id
+                              ? (() => {
+                                  const c = categoryMap.get(menu.category_id);
+                                  return c ? pickName(c, locale) : t("kit.no_menu");
+                                })()
+                              : t("combobox.none")}
+                          </span>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3 opacity-60">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
+                          </svg>
+                        </button>
                       </div>
-                    </div>
-
-                    {/* ตัวเลือกเปลี่ยนหมวดหมู่ (Desktop Only) */}
-                    <div className="hidden lg:block w-44 shrink-0">
-                      <CategoryCombobox
-                        value={menu.category_id}
-                        onChange={(id) => changeCategory(menu, id)}
-                        categories={categories}
-                        placeholder="— เปลี่ยนหมวดหมู่ —"
-                        variant="compact"
-                      />
                     </div>
 
                     {/* สวิตช์เปิด/ปิดการขาย และ ปุ่มลบ */}
                     <div className="flex items-center gap-2 pl-2 border-l border-line">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setBundlesEditingId(isEditingBundles ? null : menu.id)
-                        }
-                        className={`relative rounded-lg p-2 text-xs font-medium transition active:scale-95 ${
-                          isEditingBundles
-                            ? "bg-ink text-surface"
-                            : "text-muted hover:bg-canvas hover:text-ink"
-                        }`}
-                        title={`จัดการชุดแนะนำ (${bundleCount})`}
-                        aria-label="จัดการชุดแนะนำ"
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.6"
-                          className="h-4 w-4"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16ZM3.27 6.96 12 12.01l8.73-5.05M12 22.08V12"
-                          />
-                        </svg>
-                        {bundleCount > 0 && !isEditingBundles ? (
-                          <span className="absolute -right-1 -top-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-semibold tabular-nums text-ink">
-                            {bundleCount}
-                          </span>
-                        ) : null}
-                      </button>
-
                       <label
                         className="flex cursor-pointer items-center select-none"
-                        title={isAvailable ? "เปิดขายอยู่ (คลิกเพื่อปิด)" : "ปิดการขายอยู่ (คลิกเพื่อเปิด)"}
+                        title={isAvailable ? t("mgr.menu.available.on") : t("mgr.menu.available.off")}
                       >
                         <input
                           type="checkbox"
@@ -396,7 +382,7 @@ export default function MenuManager({
                       <button
                         onClick={() => deleteMenu(menu)}
                         className="rounded-lg p-2 text-xs font-medium text-muted transition hover:bg-red-50 hover:text-red-600 active:scale-95"
-                        aria-label="ลบเมนู"
+                        aria-label={t("common.delete")}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
@@ -404,19 +390,6 @@ export default function MenuManager({
                       </button>
                     </div>
                   </div>
-
-                  {isEditingBundles ? (
-                    <div className="border-t border-line bg-canvas/40 p-4">
-                      <div className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted">
-                        ชุดแนะนำของ &quot;{menu.name}&quot;
-                      </div>
-                      <BundleEditor
-                        bundles={menu.bundles ?? []}
-                        onChange={(next) => updateBundles(menu, next)}
-                        unitPrice={Number(menu.price)}
-                      />
-                    </div>
-                  ) : null}
                   </li>
                 );
               })}
@@ -424,6 +397,118 @@ export default function MenuManager({
           </>
         )}
       </div>
+
+      {catEditingId
+        ? (() => {
+            const target = menus.find((m) => m.id === catEditingId);
+            if (!target) return null;
+            return (
+              <CategoryPickerModal
+                title={t("mgr.menu.category")}
+                currentId={target.category_id}
+                categories={categories}
+                locale={locale}
+                noneLabel={t("combobox.none")}
+                closeLabel={t("common.close")}
+                onSelect={(id) => {
+                  void changeCategory(target, id);
+                  setCatEditingId(null);
+                }}
+                onClose={() => setCatEditingId(null)}
+              />
+            );
+          })()
+        : null}
     </div>
+  );
+}
+
+interface CategoryPickerModalProps {
+  title: string;
+  currentId: string | null;
+  categories: Category[];
+  locale: "th" | "lo" | "en";
+  noneLabel: string;
+  closeLabel: string;
+  onSelect: (id: string | null) => void;
+  onClose: () => void;
+}
+
+function CategoryPickerModal({
+  title,
+  currentId,
+  categories,
+  locale,
+  noneLabel,
+  closeLabel,
+  onSelect,
+  onClose,
+}: CategoryPickerModalProps) {
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-[70] flex items-end justify-center bg-ink/40 px-4 pb-4 animate-fade-in sm:items-center sm:pb-0"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm animate-slide-up overflow-hidden rounded-2xl bg-surface shadow-pop"
+      >
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
+          <h3 className="text-base font-semibold tracking-tight text-ink">
+            {title}
+          </h3>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1 text-muted transition hover:bg-canvas hover:text-ink"
+            aria-label={closeLabel}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <ul className="max-h-[60vh] overflow-y-auto py-1">
+          <li>
+            <PickerRow
+              label={noneLabel}
+              muted
+              selected={currentId === null}
+              onClick={() => onSelect(null)}
+            />
+          </li>
+          {categories.map((c) => (
+            <li key={c.id}>
+              <PickerRow
+                label={pickName(c, locale)}
+                selected={currentId === c.id}
+                onClick={() => onSelect(c.id)}
+              />
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+interface PickerRowProps {
+  label: string;
+  selected: boolean;
+  muted?: boolean;
+  onClick: () => void;
+}
+
+function PickerRow({ label, selected, muted, onClick }: PickerRowProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center justify-between px-5 py-3 text-left text-sm transition hover:bg-canvas ${
+        selected ? "bg-canvas font-semibold" : ""
+      } ${muted ? "text-muted" : "text-ink"}`}
+    >
+      <span>{label}</span>
+      {selected ? <span className="text-xs text-accent-600">✓</span> : null}
+    </button>
   );
 }

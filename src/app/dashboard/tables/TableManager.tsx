@@ -16,17 +16,24 @@ import {
 } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/toast";
+import { useT } from "@/lib/i18n/I18nProvider";
 import type { DiningTable } from "@/lib/types";
 
 interface Props {
   restaurantId: string;
   initialTables: DiningTable[];
+  canManage: boolean;
 }
 
-export default function TableManager({ restaurantId, initialTables }: Props) {
+export default function TableManager({
+  restaurantId,
+  initialTables,
+  canManage,
+}: Props) {
   const supabase = createClient();
   const confirm = useConfirm();
   const toast = useToast();
+  const { t } = useT();
   const [tables, setTables] = useState<DiningTable[]>(initialTables);
   const [tableNumber, setTableNumber] = useState("");
   const [busy, setBusy] = useState(false);
@@ -44,7 +51,7 @@ export default function TableManager({ restaurantId, initialTables }: Props) {
 
     const num = parseInt(tableNumber, 10);
     if (!Number.isFinite(num) || num <= 0) {
-      setError("เลขโต๊ะต้องเป็นตัวเลขบวก");
+      setError(t("mgr.tbl.error.invalid"));
       setBusy(false);
       return;
     }
@@ -56,7 +63,7 @@ export default function TableManager({ restaurantId, initialTables }: Props) {
       .single();
 
     if (insertError || !data) {
-      setError(`เพิ่มโต๊ะไม่สำเร็จ: ${insertError?.message}`);
+      setError(t("mgr.tbl.add_failed", { error: insertError?.message ?? "" }));
       setBusy(false);
       return;
     }
@@ -70,16 +77,16 @@ export default function TableManager({ restaurantId, initialTables }: Props) {
 
   async function deleteTable(table: DiningTable): Promise<void> {
     const ok = await confirm({
-      title: `ลบโต๊ะที่ ${table.table_number}?`,
-      description: "QR ของโต๊ะนี้จะใช้ไม่ได้ทันที ออเดอร์ที่ค้างอยู่จะถูกลบด้วย",
-      confirmText: "ลบโต๊ะ",
+      title: t("mgr.tbl.delete.title", { n: table.table_number }),
+      description: t("mgr.tbl.delete.desc"),
+      confirmText: t("common.delete"),
       tone: "danger",
     });
     if (!ok) return;
-    setTables((prev) => prev.filter((t) => t.id !== table.id));
+    setTables((prev) => prev.filter((x) => x.id !== table.id));
     const { error } = await supabase.from("tables").delete().eq("id", table.id);
-    if (error) toast.error(`ลบไม่สำเร็จ: ${error.message}`);
-    else toast.success(`ลบโต๊ะ ${table.table_number} แล้ว`);
+    if (error) toast.error(t("mgr.tbl.delete_failed", { error: error.message }));
+    else toast.success(t("mgr.tbl.deleted_toast", { n: table.table_number }));
   }
 
   async function downloadQR(table: DiningTable): Promise<void> {
@@ -94,61 +101,76 @@ export default function TableManager({ restaurantId, initialTables }: Props) {
   async function toggleOpen(table: DiningTable): Promise<void> {
     const next = !table.is_open;
     setTables((prev) =>
-      prev.map((t) => (t.id === table.id ? { ...t, is_open: next } : t)),
+      prev.map((x) => (x.id === table.id ? { ...x, is_open: next } : x)),
     );
     const { error } = await supabase
       .from("tables")
       .update({ is_open: next })
       .eq("id", table.id);
     if (error) {
-      toast.error(`อัปเดตไม่สำเร็จ: ${error.message}`);
+      toast.error(t("mgr.tbl.update_failed", { error: error.message }));
       setTables((prev) =>
-        prev.map((t) => (t.id === table.id ? { ...t, is_open: !next } : t)),
+        prev.map((x) => (x.id === table.id ? { ...x, is_open: !next } : x)),
       );
       return;
     }
     toast.success(
       next
-        ? `เปิดโต๊ะ ${table.table_number} แล้ว — ลูกค้าสั่งได้`
-        : `ปิดโต๊ะ ${table.table_number} แล้ว — สแกนสั่งไม่ได้`,
+        ? t("mgr.tbl.opened_toast", { n: table.table_number })
+        : t("mgr.tbl.closed_toast", { n: table.table_number }),
     );
   }
 
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[320px_1fr]">
-      <form onSubmit={handleAdd} className={`${card} ${cardPad} h-fit space-y-4 lg:sticky lg:top-20`}>
-        <SectionHeading title="เพิ่มโต๊ะ" />
+    <div
+      className={
+        canManage
+          ? "grid grid-cols-1 gap-5 lg:grid-cols-[320px_1fr]"
+          : "grid grid-cols-1 gap-5"
+      }
+    >
+      {canManage ? (
+        <form onSubmit={handleAdd} className={`${card} ${cardPad} h-fit space-y-4 lg:sticky lg:top-20`}>
+          <SectionHeading title={t("mgr.tbl.add_title")} />
 
-        <FormField label="เลขโต๊ะ">
-          <input
-            type="number"
-            min="1"
-            value={tableNumber}
-            onChange={(e) => setTableNumber(e.target.value)}
-            required
-            className={`${input} tabular-nums`}
-            placeholder="1"
-          />
-        </FormField>
+          <FormField label={t("mgr.tbl.number")}>
+            <input
+              type="number"
+              min="1"
+              value={tableNumber}
+              onChange={(e) => setTableNumber(e.target.value)}
+              required
+              className={`${input} tabular-nums`}
+              placeholder="1"
+            />
+          </FormField>
 
-        {error ? (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-        ) : null}
+          {error ? (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+          ) : null}
 
-        <button type="submit" disabled={busy} className={`${buttonPrimary} w-full`}>
-          {busy ? "กำลังเพิ่ม..." : "+ เพิ่มโต๊ะ"}
-        </button>
-      </form>
+          <button type="submit" disabled={busy} className={`${buttonPrimary} w-full`}>
+            {busy ? t("mgr.tbl.submitting") : t("mgr.tbl.submit")}
+          </button>
+        </form>
+      ) : null}
 
       <div>
         {tables.length === 0 ? (
           <EmptyState
-            title="ยังไม่มีโต๊ะ"
-            description="สร้างโต๊ะแรกเพื่อให้ลูกค้าสแกน QR สั่งอาหาร"
+            title={t("mgr.tbl.empty.title")}
+            description={
+              canManage
+                ? t("mgr.tbl.empty.desc.owner")
+                : t("mgr.tbl.empty.desc.waiter")
+            }
           />
         ) : (
           <>
-            <SectionHeading title="โต๊ะทั้งหมด" description={`${tables.length} โต๊ะ`} />
+            <SectionHeading
+              title={t("mgr.tbl.list_title")}
+              description={t("mgr.tbl.list_count", { n: tables.length })}
+            />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {tables.map((table) => (
                 <TableCard
@@ -156,6 +178,7 @@ export default function TableManager({ restaurantId, initialTables }: Props) {
                   table={table}
                   restaurantId={restaurantId}
                   origin={origin}
+                  canManage={canManage}
                   onDelete={() => deleteTable(table)}
                   onDownload={() => downloadQR(table)}
                   onToggleOpen={() => toggleOpen(table)}
@@ -173,6 +196,7 @@ interface TableCardProps {
   table: DiningTable;
   restaurantId: string;
   origin: string;
+  canManage: boolean;
   onDelete: () => void;
   onDownload: () => void;
   onToggleOpen: () => void;
@@ -182,10 +206,12 @@ function TableCard({
   table,
   restaurantId,
   origin,
+  canManage,
   onDelete,
   onDownload,
   onToggleOpen,
 }: TableCardProps) {
+  const { t } = useT();
   const [qrSrc, setQrSrc] = useState<string | null>(null);
   const url = origin ? `${origin}/menu/${restaurantId}/${table.id}` : "";
 
@@ -212,7 +238,7 @@ function TableCard({
             {table.table_number}
           </span>
           <span className="text-sm font-medium text-ink">
-            โต๊ะที่ {table.table_number}
+            {t("mgr.tbl.label", { n: table.table_number })}
           </span>
           {table.is_open ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-700">
@@ -220,20 +246,22 @@ function TableCard({
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
               </span>
-              เปิดใช้
+              {t("mgr.tbl.open_badge")}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 rounded-full bg-canvas px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted">
-              ปิดอยู่
+              {t("mgr.tbl.closed_badge")}
             </span>
           )}
         </div>
-        <button
-          onClick={onDelete}
-          className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-muted transition hover:bg-red-50 hover:text-red-600"
-        >
-          ลบ
-        </button>
+        {canManage ? (
+          <button
+            onClick={onDelete}
+            className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-muted transition hover:bg-red-50 hover:text-red-600"
+          >
+            {t("common.delete")}
+          </button>
+        ) : null}
       </div>
 
       <button
@@ -244,7 +272,7 @@ function TableCard({
             : "bg-ink text-surface shadow-ink hover:bg-ink/85"
         }`}
       >
-        {table.is_open ? "🛑 ปิดโต๊ะ (จบบริการ)" : "เปิดโต๊ะ (รับลูกค้า)"}
+        {table.is_open ? t("mgr.tbl.close_btn") : t("mgr.tbl.open_btn")}
       </button>
 
       <div className="flex gap-3">
@@ -260,7 +288,7 @@ function TableCard({
             />
           ) : (
             <div className="flex h-full items-center justify-center text-[10px] text-muted">
-              loading...
+              {t("mgr.tbl.qr_loading")}
             </div>
           )}
         </div>
@@ -274,7 +302,7 @@ function TableCard({
             {url}
           </a>
           <button onClick={onDownload} className={`${buttonSecondary} w-full py-1.5 text-xs`}>
-            ดาวน์โหลด PNG
+            {t("mgr.tbl.download")}
           </button>
         </div>
       </div>

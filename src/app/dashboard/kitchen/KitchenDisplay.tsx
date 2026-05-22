@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import { formatKIP, formatTime } from "@/lib/format";
 import { EmptyState, StatusPill } from "@/components/ui";
 import { useToast } from "@/components/toast";
+import { useT } from "@/lib/i18n/I18nProvider";
+import { pickName } from "@/lib/i18n/localized";
 import { useKitchenRealtime } from "./useKitchenRealtime";
 import { CancelOrderDialog } from "./CancelOrderDialog";
 import type {
@@ -32,6 +34,7 @@ export default function KitchenDisplay({
 }: Props) {
   const supabase = createClient();
   const toast = useToast();
+  const { t, locale } = useT();
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [calls, setCalls] = useState<CallStaffRequest[]>(initialCalls);
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
@@ -77,9 +80,9 @@ export default function KitchenDisplay({
     if (error) {
       // Rollback on failure
       setOrders((prev) => [...prev, order]);
-      toast.error(`ยกเลิกไม่สำเร็จ: ${error.message}`);
+      toast.error(t("kit.cancel_fail", { error: error.message }));
     } else {
-      toast.success(`ยกเลิกออเดอร์โต๊ะ ${tableNum} แล้ว`);
+      toast.success(t("kit.cancel_toast", { n: tableNum ?? "?" }));
     }
   }
 
@@ -97,7 +100,7 @@ export default function KitchenDisplay({
   return (
     <div className="space-y-5">
       <p className="rounded-xl border border-line bg-canvas/60 px-4 py-2.5 text-xs text-muted">
-        💡 เปิด/ปิดเสียงแจ้งเตือนได้จากปุ่มกระดิ่งบนหัวเว็บ — ใช้งานได้ทุกหน้าใน dashboard
+        {t("kit.sound_hint")}
       </p>
 
       {calls.length > 0 && (
@@ -106,7 +109,7 @@ export default function KitchenDisplay({
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-200 text-xs">
               🔔
             </span>
-            ลูกค้าเรียกพนักงาน ({calls.length})
+            {t("kit.calls.section", { n: calls.length })}
           </div>
           <ul className="space-y-1.5">
             {calls.map((call) => (
@@ -116,20 +119,22 @@ export default function KitchenDisplay({
               >
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-ink">
-                    โต๊ะที่ {tableMap.get(call.table_id)?.table_number ?? "?"}
+                    {t("kit.calls.table_n", {
+                      n: tableMap.get(call.table_id)?.table_number ?? "?",
+                    })}
                     <span className="ml-2 text-xs font-normal text-muted">
                       {formatTime(call.created_at)}
                     </span>
                   </div>
                   <div className="truncate text-xs text-muted">
-                    {call.reason || "(ไม่ระบุ)"}
+                    {call.reason || t("kit.calls.unknown")}
                   </div>
                 </div>
                 <button
                   onClick={() => ackCall(call)}
                   className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-surface hover:bg-emerald-700"
                 >
-                  รับทราบ
+                  {t("kit.calls.ack")}
                 </button>
               </li>
             ))}
@@ -139,42 +144,44 @@ export default function KitchenDisplay({
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Column
-          title="รอทำ"
+          title={t("kit.pending")}
           count={pending.length}
           tone="warning"
           orders={pending}
           menuMap={menuMap}
           tableMap={tableMap}
+          locale={locale}
           actions={(o) => (
             <div className="flex gap-2">
               <button
                 onClick={() => setCancelTarget(o)}
                 className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-muted transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
               >
-                ยกเลิก
+                {t("kit.cancel")}
               </button>
               <button
                 onClick={() => setStatus(o, "ready")}
                 className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-surface shadow-card transition hover:bg-emerald-700"
               >
-                ทำเสร็จ →
+                {t("kit.done_arrow")}
               </button>
             </div>
           )}
         />
         <Column
-          title="พร้อมเสิร์ฟ"
+          title={t("kit.ready")}
           count={ready.length}
           tone="success"
           orders={ready}
           menuMap={menuMap}
           tableMap={tableMap}
+          locale={locale}
           actions={(o) => (
             <button
               onClick={() => setStatus(o, "served")}
               className="rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-surface shadow-card transition hover:bg-ink/85"
             >
-              เสิร์ฟแล้ว ✓
+              {t("kit.served_check")}
             </button>
           )}
         />
@@ -198,6 +205,7 @@ interface ColumnProps {
   orders: Order[];
   menuMap: Map<string, Menu>;
   tableMap: Map<string, DiningTable>;
+  locale: ReturnType<typeof useT>["locale"];
   actions: (o: Order) => React.ReactNode;
 }
 
@@ -213,8 +221,10 @@ function Column({
   orders,
   menuMap,
   tableMap,
+  locale,
   actions,
 }: ColumnProps) {
+  const { t } = useT();
   return (
     <section className="overflow-hidden rounded-2xl border border-line bg-surface">
       <header className="flex items-center justify-between border-b border-line bg-canvas/50 px-4 py-3">
@@ -222,11 +232,13 @@ function Column({
           <span className={`h-2 w-2 rounded-full ${dotColor[tone]}`} />
           <h2 className="text-sm font-semibold text-ink">{title}</h2>
         </div>
-        <span className="text-xs font-medium text-muted">{count} ออเดอร์</span>
+        <span className="text-xs font-medium text-muted">
+          {t("kit.col.count", { n: count })}
+        </span>
       </header>
       {orders.length === 0 ? (
         <div className="px-4 py-12">
-          <EmptyState title="ไม่มีออเดอร์" />
+          <EmptyState title={t("kit.col.empty")} />
         </div>
       ) : (
         <ul className="divide-y divide-line">
@@ -238,7 +250,7 @@ function Column({
                     {tableMap.get(order.table_id)?.table_number ?? "?"}
                   </span>
                   <span className="text-xs text-muted">
-                    โต๊ะ · {formatTime(order.created_at)}
+                    {t("kit.col.table_at", { time: formatTime(order.created_at) })}
                   </span>
                 </div>
                 <span className="text-sm font-semibold tabular-nums text-ink">
@@ -246,26 +258,29 @@ function Column({
                 </span>
               </div>
               <ul className="space-y-1">
-                {order.items.map((item, idx) => (
-                  <li
-                    key={idx}
-                    className="flex items-baseline justify-between gap-2 text-sm"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <span className="text-ink">
-                        {menuMap.get(item.menu_id)?.name ?? "(เมนูถูกลบ)"}
-                      </span>
-                      {item.note ? (
-                        <span className="ml-2">
-                          <StatusPill tone="warning">📝 {item.note}</StatusPill>
+                {order.items.map((item, idx) => {
+                  const menu = menuMap.get(item.menu_id);
+                  return (
+                    <li
+                      key={idx}
+                      className="flex items-baseline justify-between gap-2 text-sm"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <span className="text-ink">
+                          {menu ? pickName(menu, locale) : t("kit.no_menu")}
                         </span>
-                      ) : null}
-                    </div>
-                    <span className="shrink-0 text-xs font-medium tabular-nums text-muted">
-                      ×{item.qty}
-                    </span>
-                  </li>
-                ))}
+                        {item.note ? (
+                          <span className="ml-2">
+                            <StatusPill tone="warning">📝 {item.note}</StatusPill>
+                          </span>
+                        ) : null}
+                      </div>
+                      <span className="shrink-0 text-xs font-medium tabular-nums text-muted">
+                        ×{item.qty}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
               <div className="flex justify-end">{actions(order)}</div>
             </li>

@@ -1,6 +1,8 @@
+import { redirect } from "next/navigation";
+import NoShopMessage from "@/components/NoShopMessage";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentMembership, isOwner } from "@/lib/membership";
 import FeedbackView from "./FeedbackView";
-import { PageHeader } from "@/components/ui";
 import type { Feedback } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -13,10 +15,16 @@ export default async function FeedbackPage() {
 
   if (!user) return null;
 
+  const membership = await getCurrentMembership(supabase);
+  if (!membership) {
+    return <p className="text-muted">ยังไม่มีร้าน — กรุณา signup ใหม่</p>;
+  }
+  if (!isOwner(membership.role)) redirect("/dashboard");
+
   const { data: restaurant } = await supabase
     .from("restaurants")
     .select("id, name")
-    .eq("user_id", user.id)
+    .eq("id", membership.restaurantId)
     .maybeSingle();
 
   const { data: feedback } = await supabase

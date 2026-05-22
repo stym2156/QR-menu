@@ -3,15 +3,24 @@
 
 import { formatKIP, formatTime } from "@/lib/format";
 import { calculateBill } from "@/lib/bill";
+import { DICTIONARIES } from "@/lib/i18n/dict";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n/types";
+import { pickName } from "@/lib/i18n/localized";
 import type { Menu, Order, PaymentMethod } from "@/lib/types";
 
-const PAYMENT_LABEL: Record<PaymentMethod, string> = {
-  cash: "เงินสด",
-  promptpay: "พร้อมเพย์",
-  transfer: "โอน",
-  card: "บัตร",
-  other: "อื่นๆ",
-};
+type Translate = (key: string, vars?: Record<string, string | number>) => string;
+
+function makeTranslator(locale: Locale): Translate {
+  const dict = DICTIONARIES[locale];
+  const fallback = DICTIONARIES[DEFAULT_LOCALE];
+  return (key, vars) => {
+    const v = dict[key] ?? fallback[key] ?? key;
+    if (!vars) return v;
+    return v.replace(/\{(\w+)\}/g, (_, name: string) =>
+      name in vars ? String(vars[name]) : `{${name}}`,
+    );
+  };
+}
 
 interface PrintReceiptInput {
   restaurantName: string;
@@ -22,9 +31,13 @@ interface PrintReceiptInput {
   paidAt: string;
   serviceChargePct: number;
   vatPct: number;
+  paymentQrUrl?: string | null;
+  locale?: Locale;
 }
 
 export function printReceipt(input: PrintReceiptInput): void {
+  const locale = input.locale ?? DEFAULT_LOCALE;
+  const t = makeTranslator(locale);
   const menuMap = new Map(input.menus.map((m) => [m.id, m]));
   const subtotal = input.orders.reduce((s, o) => s + Number(o.total), 0);
   const bill = calculateBill(subtotal, input.serviceChargePct, input.vatPct);
@@ -33,54 +46,116 @@ export function printReceipt(input: PrintReceiptInput): void {
     ...input,
     menuMap,
     bill,
+    locale,
+    t,
   });
 
-  const w = window.open("", "_blank", "width=400,height=600");
-  if (!w) {
-    alert("เบราว์เซอร์บล็อกการเปิดหน้าต่างใหม่ — กรุณาอนุญาต popup");
+  // Hidden iframe avoids popup blockers and works on mobile Safari where
+  // window.open + document.write is unreliable.
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  iframe.style.visibility = "hidden";
+
+  const cleanup = (): void => {
+    if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+  };
+
+  iframe.onload = (): void => {
+    const win = iframe.contentWindow;
+    if (!win) {
+      cleanup();
+      return;
+    }
+    const doPrint = (): void => {
+      try {
+        win.focus();
+        win.print();
+      } finally {
+        // Some browsers fire onafterprint, others don't — clean up either way.
+        setTimeout(cleanup, 1000);
+      }
+    };
+    // Wait for fonts AND images (QR code) before printing — prevents blank output.
+    const fonts = (win.document as Document & { fonts?: { ready: Promise<unknown> } }).fonts;
+    const fontsReady = fonts?.ready ?? Promise.resolve();
+    const imgs = Array.from(win.document.images);
+    const imagesReady = Promise.all(
+      imgs.map((img) =>
+        img.complete
+          ? Promise.resolve()
+          : new Promise<void>((resolve) => {
+              img.onload = () => resolve();
+              img.onerror = () => resolve();
+            }),
+      ),
+    );
+    Promise.all([fontsReady, imagesReady]).then(doPrint).catch(doPrint);
+  };
+
+  document.body.appendChild(iframe);
+  const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
+  if (!doc) {
+    cleanup();
+    alert("ไม่สามารถสร้างใบเสร็จได้ — กรุณาลองใหม่");
     return;
   }
-  w.document.write(html);
-  w.document.close();
-  // Give the new document time to layout before printing.
-  setTimeout(() => {
-    w.focus();
-    w.print();
-  }, 150);
+  doc.open();
+  doc.write(html);
+  doc.close();
 }
 
 interface RenderInput extends PrintReceiptInput {
   menuMap: Map<string, Menu>;
   bill: ReturnType<typeof calculateBill>;
+  locale: Locale;
+  t: Translate;
 }
 
 function renderHTML(input: RenderInput): string {
+  const t = input.t;
   const lines: string[] = [];
+  let totalQty = 0;
   for (const order of input.orders) {
     for (const item of order.items) {
       const menu = input.menuMap.get(item.menu_id);
-      const name = menu?.name ?? "(เมนูถูกลบ)";
-      const price = (menu?.price ?? 0) * item.qty;
+      const name = menu
+        ? pickName(menu, input.locale)
+        : t("receipt.menu_removed");
+      const unit = menu?.price ?? 0;
+      const lineTotal = unit * item.qty;
+      totalQty += item.qty;
       lines.push(
-        `<tr><td>${escape(name)}${
-          item.note ? `<div class="note">${escape(item.note)}</div>` : ""
-        }</td><td class="qty">×${item.qty}</td><td class="total">${formatKIP(price)}</td></tr>`,
+        `<tr>
+          <td>
+            ${escape(name)}
+            <div class="unit">${formatKIP(unit)} × ${item.qty}</div>
+            ${item.note ? `<div class="note">${escape(item.note)}</div>` : ""}
+          </td>
+          <td class="qty">×${item.qty}</td>
+          <td class="total">${formatKIP(lineTotal)}</td>
+        </tr>`,
       );
     }
   }
 
   const time = formatTime(input.paidAt);
-  const date = new Date(input.paidAt).toLocaleDateString("th-TH", {
+  const date = new Date(input.paidAt).toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
 
   return `<!doctype html>
-<html lang="th">
+<html lang="${input.locale}">
 <head>
 <meta charset="utf-8" />
-<title>ใบเสร็จ — โต๊ะ ${input.tableNumber}</title>
+<title>${escape(t("receipt.title_table", { n: input.tableNumber }))}</title>
 <style>
   @page { size: 58mm auto; margin: 4mm; }
   * { box-sizing: border-box; }
@@ -94,8 +169,13 @@ function renderHTML(input: RenderInput): string {
   th { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: #666; font-weight: 600; }
   .qty { text-align: right; width: 36px; }
   .total { text-align: right; width: 90px; font-variant-numeric: tabular-nums; }
+  .unit { font-size: 9px; color: #666; font-variant-numeric: tabular-nums; margin-top: 1px; }
   .note { font-size: 9px; color: #555; padding-left: 6px; }
   .grand { font-size: 14px; font-weight: 700; }
+  .summary { font-size: 9px; color: #555; text-align: center; margin: 6px 0; }
+  .qr-section { margin-top: 12px; text-align: center; }
+  .qr-section img { width: 140px; height: 140px; object-fit: contain; display: block; margin: 0 auto; }
+  .qr-label { font-size: 10px; font-weight: 600; margin-bottom: 4px; }
   .footer { font-size: 9px; color: #666; text-align: center; margin-top: 10px; }
   @media print {
     body { padding: 0; }
@@ -107,46 +187,55 @@ function renderHTML(input: RenderInput): string {
   <div class="center">
     <h1>${escape(input.restaurantName)}</h1>
     <div class="meta">
-      โต๊ะที่ ${input.tableNumber}<br/>
-      ${date} · ${time}
+      ${escape(t("receipt.table_n", { n: input.tableNumber }))}<br/>
+      ${escape(date)} · ${escape(time)}
     </div>
   </div>
   <hr/>
   <table>
     <thead>
-      <tr><th>รายการ</th><th class="qty">จน</th><th class="total">ราคา</th></tr>
+      <tr><th>${escape(t("receipt.col.item"))}</th><th class="qty">${escape(t("receipt.col.qty"))}</th><th class="total">${escape(t("receipt.col.price"))}</th></tr>
     </thead>
     <tbody>
       ${lines.join("")}
     </tbody>
   </table>
+  <div class="summary">${escape(t("receipt.total_items", { n: totalQty }))}</div>
   <hr/>
   <table>
     <tr>
-      <td>รวมรายการ</td>
+      <td>${escape(t("receipt.subtotal"))}</td>
       <td class="total">${formatKIP(input.bill.subtotal)}</td>
     </tr>
     ${
       input.bill.serviceChargePct > 0
-        ? `<tr><td>Service ${input.bill.serviceChargePct}%</td><td class="total">${formatKIP(input.bill.serviceCharge)}</td></tr>`
+        ? `<tr><td>${escape(t("receipt.service", { pct: input.bill.serviceChargePct }))}</td><td class="total">${formatKIP(input.bill.serviceCharge)}</td></tr>`
         : ""
     }
     ${
       input.bill.vatPct > 0
-        ? `<tr><td>VAT ${input.bill.vatPct}%</td><td class="total">${formatKIP(input.bill.vat)}</td></tr>`
+        ? `<tr><td>${escape(t("receipt.vat", { pct: input.bill.vatPct }))}</td><td class="total">${formatKIP(input.bill.vat)}</td></tr>`
         : ""
     }
     <tr>
-      <td class="grand">ยอดสุทธิ</td>
+      <td class="grand">${escape(t("receipt.grand"))}</td>
       <td class="total grand">${formatKIP(input.bill.grandTotal)}</td>
     </tr>
     <tr>
-      <td>ชำระโดย</td>
-      <td class="total">${PAYMENT_LABEL[input.method]}</td>
+      <td>${escape(t("receipt.paid_by"))}</td>
+      <td class="total">${escape(t(`bill.settled.method.${input.method}`))}</td>
     </tr>
   </table>
-  <div class="footer">ขอบคุณที่ใช้บริการ</div>
-  <script>window.onafterprint = () => window.close();</script>
+  ${
+    input.paymentQrUrl
+      ? `<hr/>
+  <div class="qr-section">
+    <div class="qr-label">${escape(t("receipt.scan_to_pay"))}</div>
+    <img src="${escape(input.paymentQrUrl)}" alt="${escape(t("receipt.qr_alt"))}" />
+  </div>`
+      : ""
+  }
+  <div class="footer">${escape(t("receipt.thanks"))}</div>
 </body>
 </html>`;
 }

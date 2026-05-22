@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useT } from "@/lib/i18n/I18nProvider";
+import { LanguageSwitcher } from "@/lib/i18n/LanguageSwitcher";
 import {
   FormField,
   buttonPrimary,
@@ -15,6 +17,7 @@ import {
 export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { t } = useT();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +34,7 @@ export default function LoginPage() {
     });
 
     if (signInError) {
-      setError(signInError.message);
+      setError(t("auth.login.invalid"));
       setLoading(false);
       return;
     }
@@ -42,33 +45,38 @@ export default function LoginPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5 py-12">
-      <Link
-        href="/"
-        className="mb-8 inline-flex items-center gap-2 self-center text-base font-semibold tracking-tight text-ink"
-      >
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-ink text-xs font-bold text-surface">
-          Q
-        </span>
-        QR Menu
-      </Link>
+      <div className="mb-8 flex items-center justify-between">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-base font-semibold tracking-tight text-ink"
+        >
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-ink text-xs font-bold text-surface">
+            Q
+          </span>
+          QR Menu
+        </Link>
+        <LanguageSwitcher variant="compact" />
+      </div>
 
       <div className={`${card} ${cardPad}`}>
-        <h1 className="text-xl font-semibold tracking-tight text-ink">เข้าสู่ระบบ</h1>
-        <p className="mt-1 text-sm text-muted">ยินดีต้อนรับกลับ</p>
+        <h1 className="text-xl font-semibold tracking-tight text-ink">
+          {t("auth.login.title")}
+        </h1>
+        <p className="mt-1 text-sm text-muted">{t("auth.login.subtitle")}</p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <FormField label="อีเมล">
+          <FormField label={t("auth.field.email")}>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               className={input}
-              placeholder="you@example.com"
+              placeholder={t("auth.field.email.placeholder")}
             />
           </FormField>
 
-          <FormField label="รหัสผ่าน">
+          <FormField label={t("auth.field.password")}>
             <input
               type="password"
               value={password}
@@ -90,15 +98,15 @@ export default function LoginPage() {
             disabled={loading}
             className={`${buttonPrimary} w-full`}
           >
-            {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+            {loading ? t("auth.login.submitting") : t("auth.login.submit")}
           </button>
         </form>
       </div>
 
       <p className="mt-6 text-center text-sm text-muted">
-        ยังไม่มีบัญชี?{" "}
+        {t("auth.login.no_account")}{" "}
         <Link href="/signup" className="font-medium text-ink hover:underline">
-          เปิดร้านใหม่
+          {t("auth.signup.title")}
         </Link>
       </p>
     </main>

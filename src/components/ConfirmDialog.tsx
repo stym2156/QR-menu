@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useT } from "@/lib/i18n/I18nProvider";
 
 interface ConfirmOptions {
   title: string;
@@ -80,6 +81,7 @@ function ConfirmModal({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useT();
   const isDanger = options.tone === "danger";
   return (
     <div
@@ -103,7 +105,7 @@ function ConfirmModal({
             onClick={onCancel}
             className="flex-1 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-canvas"
           >
-            {options.cancelText ?? "ยกเลิก"}
+            {options.cancelText ?? t("confirm.cancel")}
           </button>
           <button
             onClick={onConfirm}
@@ -114,7 +116,7 @@ function ConfirmModal({
                 : "bg-ink hover:bg-ink/85"
             }`}
           >
-            {options.confirmText ?? "ยืนยัน"}
+            {options.confirmText ?? t("confirm.confirm")}
           </button>
         </div>
       </div>

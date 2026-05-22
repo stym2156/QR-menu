@@ -4,6 +4,8 @@ import { useState } from "react";
 import { formatKIP, formatTime } from "@/lib/format";
 import { calculateBill } from "@/lib/bill";
 import { buttonPrimary } from "@/components/ui";
+import { useT } from "@/lib/i18n/I18nProvider";
+import { pickName } from "@/lib/i18n/localized";
 import type { DiningTable, Menu, Order, PaymentMethod } from "@/lib/types";
 
 export interface BillGroup {
@@ -14,12 +16,12 @@ export interface BillGroup {
   itemCount: number;
 }
 
-const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: string }[] = [
-  { value: "cash", label: "เงินสด", icon: "💵" },
-  { value: "promptpay", label: "พร้อมเพย์", icon: "📱" },
-  { value: "transfer", label: "โอน", icon: "🏦" },
-  { value: "card", label: "บัตร", icon: "💳" },
-  { value: "other", label: "อื่นๆ", icon: "•" },
+const PAYMENT_METHODS: { value: PaymentMethod; icon: string }[] = [
+  { value: "cash", icon: "💵" },
+  { value: "promptpay", icon: "📱" },
+  { value: "transfer", icon: "🏦" },
+  { value: "card", icon: "💳" },
+  { value: "other", icon: "•" },
 ];
 
 interface BillModalProps {
@@ -39,6 +41,7 @@ export function BillModal({
   onClose,
   onSettle,
 }: BillModalProps) {
+  const { t, locale } = useT();
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [busy, setBusy] = useState(false);
   const bill = calculateBill(group.total, serviceChargePct, vatPct);
@@ -64,13 +67,13 @@ export function BillModal({
               {group.table?.table_number}
             </span>
             <h3 className="text-base font-semibold tracking-tight text-ink">
-              บิลโต๊ะที่ {group.table?.table_number}
+              {t("bill.modal.title", { n: group.table?.table_number ?? "?" })}
             </h3>
           </div>
           <button
             onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-full text-muted transition hover:bg-canvas hover:text-ink"
-            aria-label="ปิด"
+            aria-label={t("common.close")}
           >
             ✕
           </button>
@@ -81,20 +84,21 @@ export function BillModal({
             {group.orders.map((order, idx) => (
               <div key={order.id}>
                 <div className="mb-1.5 flex items-center justify-between text-[11px] font-medium uppercase tracking-wider text-muted">
-                  <span>ออเดอร์ #{idx + 1}</span>
+                  <span>{t("bill.modal.order_n", { n: idx + 1 })}</span>
                   <span>{formatTime(order.created_at)}</span>
                 </div>
                 <ul className="space-y-1.5">
                   {order.items.map((item, i) => {
                     const menu = menuMap.get(item.menu_id);
                     const lineTotal = (menu?.price ?? 0) * item.qty;
+                    const name = menu ? pickName(menu, locale) : t("kit.no_menu");
                     return (
                       <li
                         key={i}
                         className="flex items-baseline justify-between gap-3 text-sm"
                       >
                         <span className="min-w-0 flex-1 text-ink">
-                          {menu?.name ?? "(เมนูถูกลบ)"}{" "}
+                          {name}{" "}
                           <span className="text-muted">×{item.qty}</span>
                           {item.note ? (
                             <div className="text-xs text-muted">📝 {item.note}</div>
@@ -112,23 +116,25 @@ export function BillModal({
           </div>
 
           <div className="mt-6 space-y-1.5 rounded-2xl bg-canvas p-4">
-            <BillLine label="ยอดรวมรายการ" value={bill.subtotal} muted />
+            <BillLine label={t("bill.modal.subtotal")} value={bill.subtotal} muted />
             {bill.serviceChargePct > 0 ? (
               <BillLine
-                label={`Service charge (${bill.serviceChargePct}%)`}
+                label={t("bill.modal.service", { pct: bill.serviceChargePct })}
                 value={bill.serviceCharge}
                 muted
               />
             ) : null}
             {bill.vatPct > 0 ? (
               <BillLine
-                label={`VAT (${bill.vatPct}%)`}
+                label={t("bill.modal.vat", { pct: bill.vatPct })}
                 value={bill.vat}
                 muted
               />
             ) : null}
             <div className="mt-2 flex items-baseline justify-between border-t border-line pt-2">
-              <span className="text-sm font-medium text-muted">ยอดสุทธิ</span>
+              <span className="text-sm font-medium text-muted">
+                {t("bill.modal.grand")}
+              </span>
               <span className="text-3xl font-semibold tabular-nums tracking-tight text-ink">
                 {formatKIP(bill.grandTotal)}
               </span>
@@ -137,7 +143,7 @@ export function BillModal({
 
           <div className="mt-6">
             <div className="mb-2.5 text-xs font-medium uppercase tracking-wider text-muted">
-              วิธีชำระเงิน
+              {t("bill.modal.pay_method")}
             </div>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
               {PAYMENT_METHODS.map((m) => (
@@ -151,7 +157,7 @@ export function BillModal({
                   }`}
                 >
                   <span className="text-base leading-none">{m.icon}</span>
-                  <span>{m.label}</span>
+                  <span>{t(`bill.settled.method.${m.value}`)}</span>
                 </button>
               ))}
             </div>
@@ -162,7 +168,9 @@ export function BillModal({
             disabled={busy}
             className={`${buttonPrimary} mt-6 w-full py-3.5 text-base`}
           >
-            {busy ? "กำลังบันทึก..." : `รับชำระ ${formatKIP(bill.grandTotal)}`}
+            {busy
+              ? t("bill.modal.settling")
+              : t("bill.modal.settle_now", { amount: formatKIP(bill.grandTotal) })}
           </button>
         </div>
       </div>

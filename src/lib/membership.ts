@@ -3,7 +3,28 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type RestaurantRole = "owner" | "staff";
+export type RestaurantRole = "owner" | "staff" | "cook" | "waiter";
+
+// Role helpers for role-gated UI/page access.
+export function canSeeKitchen(role: RestaurantRole): boolean {
+  return role === "owner" || role === "cook" || role === "staff";
+}
+
+export function canSeeBills(role: RestaurantRole): boolean {
+  return role === "owner" || role === "waiter" || role === "staff";
+}
+
+export function canSeeTables(role: RestaurantRole): boolean {
+  return role === "owner" || role === "waiter";
+}
+
+export function canManageTables(role: RestaurantRole): boolean {
+  return role === "owner";
+}
+
+export function isOwner(role: RestaurantRole): boolean {
+  return role === "owner";
+}
 
 export interface Membership {
   restaurantId: string;

@@ -2,19 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useT } from "@/lib/i18n/I18nProvider";
 import type { RestaurantRole } from "@/lib/membership";
+
+type Role = RestaurantRole;
 
 interface NavItem {
   href: string;
-  label: string;
+  // i18n key for the label (e.g., "nav.home"). Resolved at render time.
+  labelKey: string;
   icon: React.ReactNode;
-  staffAllowed?: boolean;
+  // Roles that can see this nav item. Defaults to owner-only when omitted.
+  allowedRoles?: Role[];
 }
 
 const NAV: NavItem[] = [
   {
     href: "/dashboard",
-    label: "หน้าหลัก",
+    labelKey: "nav.home",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path
@@ -27,7 +32,7 @@ const NAV: NavItem[] = [
   },
   {
     href: "/dashboard/menu",
-    label: "เมนู",
+    labelKey: "nav.menu",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path
@@ -40,7 +45,7 @@ const NAV: NavItem[] = [
   },
   {
     href: "/dashboard/categories",
-    label: "หมวดหมู่",
+    labelKey: "nav.categories",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path
@@ -53,7 +58,8 @@ const NAV: NavItem[] = [
   },
   {
     href: "/dashboard/tables",
-    label: "โต๊ะ & QR",
+    labelKey: "nav.tables",
+    allowedRoles: ["owner", "waiter"],
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path
@@ -66,8 +72,8 @@ const NAV: NavItem[] = [
   },
   {
     href: "/dashboard/kitchen",
-    label: "ครัว",
-    staffAllowed: true,
+    labelKey: "nav.kitchen",
+    allowedRoles: ["owner", "cook", "staff"],
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path
@@ -80,8 +86,8 @@ const NAV: NavItem[] = [
   },
   {
     href: "/dashboard/bills",
-    label: "เช็คบิล",
-    staffAllowed: true,
+    labelKey: "nav.bills",
+    allowedRoles: ["owner", "waiter", "staff"],
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path
@@ -94,7 +100,7 @@ const NAV: NavItem[] = [
   },
   {
     href: "/dashboard/promotions",
-    label: "โปรโมชัน",
+    labelKey: "nav.promotions",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path
@@ -107,7 +113,7 @@ const NAV: NavItem[] = [
   },
   {
     href: "/dashboard/stats",
-    label: "สถิติ",
+    labelKey: "nav.stats",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path
@@ -120,7 +126,7 @@ const NAV: NavItem[] = [
   },
   {
     href: "/dashboard/feedback",
-    label: "ส่งข้อความ",
+    labelKey: "nav.feedback",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path
@@ -133,7 +139,7 @@ const NAV: NavItem[] = [
   },
   {
     href: "/dashboard/settings",
-    label: "ตั้งค่า",
+    labelKey: "nav.settings",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
         <circle cx="12" cy="12" r="3" />
@@ -155,26 +161,31 @@ function isActive(pathname: string | null, href: string): boolean {
 
 export default function TopNav({ role = "owner" }: { role?: RestaurantRole }) {
   const pathname = usePathname();
-  const items = role === "staff" ? NAV.filter((n) => n.staffAllowed) : NAV;
+  const { t } = useT();
+  // Items without allowedRoles default to owner-only.
+  const items = NAV.filter((item) => {
+    const allowed = item.allowedRoles ?? ["owner"];
+    return allowed.includes(role);
+  });
 
   return (
-    <nav className="no-scrollbar -mx-1 flex gap-1 overflow-x-auto">
+    <nav className="no-scrollbar -mx-4 flex gap-x-1 overflow-x-auto lg:gap-x-1.5 lg:overflow-visible">
       {items.map((item) => {
         const active = isActive(pathname, item.href);
         return (
           <Link
             key={item.href}
             href={item.href}
-            className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+            className={`flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition ${
               active
                 ? "bg-canvas text-ink"
                 : "text-muted hover:bg-canvas hover:text-ink"
             }`}
           >
-            <span className="flex h-4 w-4 shrink-0 items-center justify-center [&>svg]:h-full [&>svg]:w-full">
+            <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center [&>svg]:h-full [&>svg]:w-full">
               {item.icon}
             </span>
-            <span>{item.label}</span>
+            <span>{t(item.labelKey)}</span>
           </Link>
         );
       })}

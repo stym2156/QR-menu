@@ -10,6 +10,7 @@ export type Restaurant = {
   close_time: string | null;
   service_charge_pct: number;
   vat_pct: number;
+  payment_qr_url: string | null;
   created_at: string;
 };
 
@@ -39,6 +40,8 @@ export type Category = {
   id: string;
   restaurant_id: string;
   name: string;
+  name_lo: string | null;
+  name_en: string | null;
   sort_order: number;
   created_at: string;
 };
@@ -53,6 +56,8 @@ export type Menu = {
   restaurant_id: string;
   category_id: string | null;
   name: string;
+  name_lo: string | null;
+  name_en: string | null;
   price: number;
   image_url: string | null;
   available: boolean;

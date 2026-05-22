@@ -1,5 +1,7 @@
 "use client";
 
+import { useT } from "@/lib/i18n/I18nProvider";
+
 interface SheetProps {
   title: string;
   onClose: () => void;
@@ -7,6 +9,7 @@ interface SheetProps {
 }
 
 export function Sheet({ title, onClose, children }: SheetProps) {
+  const { t } = useT();
   return (
     <div
       onClick={onClose}
@@ -21,7 +24,7 @@ export function Sheet({ title, onClose, children }: SheetProps) {
           <button
             onClick={onClose}
             className="flex h-8 w-8 items-center justify-center rounded-full text-muted transition hover:bg-canvas hover:text-ink"
-            aria-label="ปิด"
+            aria-label={t("common.close")}
           >
             ✕
           </button>

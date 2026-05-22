@@ -1,16 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import {
   FormField,
   SectionHeading,
   buttonPrimary,
+  buttonSecondary,
   card,
   cardPad,
   input,
 } from "@/components/ui";
 import { useToast } from "@/components/toast";
+import { compressImage } from "@/lib/image";
+import { randomId } from "@/lib/uuid";
+import { useT } from "@/lib/i18n/I18nProvider";
 import type { Restaurant } from "@/lib/types";
 
 interface Props {
@@ -21,6 +26,7 @@ interface Props {
 export default function SettingsForm({ restaurant, userEmail }: Props) {
   const supabase = createClient();
   const toast = useToast();
+  const { t } = useT();
 
   const [name, setName] = useState(restaurant.name);
   const [acceptingOrders, setAcceptingOrders] = useState(
@@ -34,25 +40,79 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
   const [vatPct, setVatPct] = useState(String(restaurant.vat_pct ?? 0));
   const [savingShop, setSavingShop] = useState(false);
 
+  const [paymentQrUrl, setPaymentQrUrl] = useState<string | null>(
+    restaurant.payment_qr_url ?? null,
+  );
+  const [uploadingQr, setUploadingQr] = useState(false);
+
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
   const [savingPw, setSavingPw] = useState(false);
 
+  async function handleQrUpload(file: File): Promise<void> {
+    setUploadingQr(true);
+    try {
+      const compressed = await compressImage(file, { maxDimension: 800 }).catch(
+        () => file,
+      );
+      const ext = compressed.name.split(".").pop() ?? "png";
+      const path = `${restaurant.id}/${randomId()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("payment-qr")
+        .upload(path, compressed, { cacheControl: "3600", upsert: false });
+      if (uploadError) {
+        toast.error(t("set.qr.upload_failed", { error: uploadError.message }));
+        return;
+      }
+      const { data: pub } = supabase.storage
+        .from("payment-qr")
+        .getPublicUrl(path);
+      const url = pub.publicUrl;
+      const { error: dbError } = await supabase
+        .from("restaurants")
+        .update({ payment_qr_url: url })
+        .eq("id", restaurant.id);
+      if (dbError) {
+        toast.error(t("set.qr.save_failed", { error: dbError.message }));
+        return;
+      }
+      setPaymentQrUrl(url);
+      toast.success(t("set.qr.saved"));
+    } finally {
+      setUploadingQr(false);
+    }
+  }
+
+  async function handleQrRemove(): Promise<void> {
+    setUploadingQr(true);
+    const { error } = await supabase
+      .from("restaurants")
+      .update({ payment_qr_url: null })
+      .eq("id", restaurant.id);
+    setUploadingQr(false);
+    if (error) {
+      toast.error(t("set.qr.remove_failed", { error: error.message }));
+      return;
+    }
+    setPaymentQrUrl(null);
+    toast.success(t("set.qr.removed"));
+  }
+
   async function saveShop(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     if (!name.trim()) {
-      toast.error("กรุณาใส่ชื่อร้าน");
+      toast.error(t("set.shop.error.name"));
       return;
     }
     const service = Number(serviceCharge);
     const vat = Number(vatPct);
     if (!Number.isFinite(service) || service < 0 || service > 100) {
-      toast.error("Service charge ต้องเป็น 0–100");
+      toast.error(t("set.shop.error.service"));
       return;
     }
     if (!Number.isFinite(vat) || vat < 0 || vat > 100) {
-      toast.error("VAT ต้องเป็น 0–100");
+      toast.error(t("set.shop.error.vat"));
       return;
     }
     setSavingShop(true);
@@ -69,20 +129,20 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
       .eq("id", restaurant.id);
     setSavingShop(false);
     if (error) {
-      toast.error(`บันทึกไม่สำเร็จ: ${error.message}`);
+      toast.error(t("set.shop.error.save", { error: error.message }));
       return;
     }
-    toast.success("บันทึกการตั้งค่าแล้ว");
+    toast.success(t("set.shop.saved"));
   }
 
   async function savePassword(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     if (newPw.length < 6) {
-      toast.error("รหัสผ่านใหม่ต้องอย่างน้อย 6 ตัวอักษร");
+      toast.error(t("set.pw.error.short"));
       return;
     }
     if (newPw !== confirmPw) {
-      toast.error("รหัสผ่านยืนยันไม่ตรงกัน");
+      toast.error(t("set.pw.error.mismatch"));
       return;
     }
     setSavingPw(true);
@@ -94,7 +154,7 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
     });
     if (verifyError) {
       setSavingPw(false);
-      toast.error("รหัสผ่านปัจจุบันไม่ถูกต้อง");
+      toast.error(t("set.pw.error.invalid"));
       return;
     }
 
@@ -103,10 +163,10 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
     });
     setSavingPw(false);
     if (updateError) {
-      toast.error(`เปลี่ยนรหัสผ่านไม่สำเร็จ: ${updateError.message}`);
+      toast.error(t("set.pw.error.save", { error: updateError.message }));
       return;
     }
-    toast.success("เปลี่ยนรหัสผ่านแล้ว");
+    toast.success(t("set.pw.saved"));
     setCurrentPw("");
     setNewPw("");
     setConfirmPw("");
@@ -116,11 +176,11 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
     <div className="space-y-5">
       <form onSubmit={saveShop} className={`${card} ${cardPad} space-y-5`}>
         <SectionHeading
-          title="ข้อมูลร้าน"
-          description="แก้ไขชื่อและสถานะรับออเดอร์"
+          title={t("set.shop.title")}
+          description={t("set.shop.desc")}
         />
 
-        <FormField label="ชื่อร้าน">
+        <FormField label={t("set.shop.name")}>
           <input
             type="text"
             value={name}
@@ -134,14 +194,12 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
         <div className="rounded-2xl border border-line bg-canvas/40 p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-sm font-medium text-ink">รับออเดอร์</div>
-              <p className="mt-0.5 text-xs text-muted">
-                ปิดเมื่อร้านปิดทำการ — ลูกค้าจะเห็นข้อความ &quot;ร้านปิดอยู่&quot; แทนเมนู
-              </p>
+              <div className="text-sm font-medium text-ink">{t("set.shop.accepting")}</div>
+              <p className="mt-0.5 text-xs text-muted">{t("set.shop.accepting_hint")}</p>
             </div>
             <label
               className="flex shrink-0 cursor-pointer items-center gap-2 select-none"
-              title="เปิด/ปิดรับออเดอร์"
+              title={t("set.shop.accepting")}
             >
               <input
                 type="checkbox"
@@ -155,7 +213,7 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <FormField label="เวลาเปิด" hint="ไม่บังคับ">
+          <FormField label={t("set.shop.open_time")} hint={t("common.optional")}>
             <input
               type="time"
               value={openTime}
@@ -163,7 +221,7 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
               className={`${input} tabular-nums`}
             />
           </FormField>
-          <FormField label="เวลาปิด" hint="ไม่บังคับ">
+          <FormField label={t("set.shop.close_time")} hint={t("common.optional")}>
             <input
               type="time"
               value={closeTime}
@@ -174,12 +232,10 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
         </div>
 
         <div className="rounded-2xl border border-line bg-canvas/40 p-4 space-y-3">
-          <div className="text-sm font-medium text-ink">ค่าบริการ + ภาษี</div>
-          <p className="text-xs text-muted">
-            ตั้งเป็น 0 ถ้าไม่ต้องการคิด · VAT จะถูกคำนวณจาก (ยอด + service)
-          </p>
+          <div className="text-sm font-medium text-ink">{t("set.shop.tax_title")}</div>
+          <p className="text-xs text-muted">{t("set.shop.tax_desc")}</p>
           <div className="grid grid-cols-2 gap-3">
-            <FormField label="Service charge %">
+            <FormField label={t("set.shop.service")}>
               <div className="relative">
                 <input
                   type="number"
@@ -195,7 +251,7 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
                 </span>
               </div>
             </FormField>
-            <FormField label="VAT %">
+            <FormField label={t("set.shop.vat")}>
               <div className="relative">
                 <input
                   type="number"
@@ -219,17 +275,86 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
           disabled={savingShop}
           className={`${buttonPrimary} w-full`}
         >
-          {savingShop ? "กำลังบันทึก..." : "บันทึกข้อมูลร้าน"}
+          {savingShop ? t("set.shop.submitting") : t("set.shop.submit")}
         </button>
       </form>
 
-      <form onSubmit={savePassword} className={`${card} ${cardPad} space-y-4`}>
+      <div className={`${card} ${cardPad} space-y-4`}>
         <SectionHeading
-          title="เปลี่ยนรหัสผ่าน"
-          description={`บัญชี ${userEmail}`}
+          title={t("set.qr.title")}
+          description={t("set.qr.desc")}
         />
 
-        <FormField label="รหัสผ่านปัจจุบัน">
+        {paymentQrUrl ? (
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-canvas/40 p-4">
+            <div className="relative h-48 w-48 overflow-hidden rounded-xl border border-line bg-surface">
+              <Image
+                src={paymentQrUrl}
+                alt={t("set.qr.title")}
+                fill
+                className="object-contain p-2"
+                sizes="192px"
+                unoptimized
+              />
+            </div>
+            <div className="flex gap-2">
+              <label className={`${buttonSecondary} cursor-pointer py-2 text-xs`}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploadingQr}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void handleQrUpload(f);
+                    e.target.value = "";
+                  }}
+                />
+                {t("set.qr.change")}
+              </label>
+              <button
+                type="button"
+                onClick={() => void handleQrRemove()}
+                disabled={uploadingQr}
+                className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-100 disabled:opacity-50"
+              >
+                {t("set.qr.remove")}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <label
+            className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line bg-canvas/40 px-4 py-8 text-center transition hover:border-ink/30 hover:bg-canvas ${
+              uploadingQr ? "pointer-events-none opacity-60" : ""
+            }`}
+          >
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={uploadingQr}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleQrUpload(f);
+                e.target.value = "";
+              }}
+            />
+            <span className="text-2xl">📱</span>
+            <div className="text-sm font-medium text-ink">
+              {uploadingQr ? t("set.qr.uploading") : t("set.qr.upload")}
+            </div>
+            <p className="text-xs text-muted">{t("set.qr.hint")}</p>
+          </label>
+        )}
+      </div>
+
+      <form onSubmit={savePassword} className={`${card} ${cardPad} space-y-4`}>
+        <SectionHeading
+          title={t("set.pw.title")}
+          description={t("set.pw.desc_email", { email: userEmail })}
+        />
+
+        <FormField label={t("set.pw.current")}>
           <input
             type="password"
             value={currentPw}
@@ -240,7 +365,7 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
           />
         </FormField>
 
-        <FormField label="รหัสผ่านใหม่" hint="อย่างน้อย 6 ตัวอักษร">
+        <FormField label={t("set.pw.new")} hint={t("set.pw.new.hint")}>
           <input
             type="password"
             value={newPw}
@@ -252,7 +377,7 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
           />
         </FormField>
 
-        <FormField label="ยืนยันรหัสผ่านใหม่">
+        <FormField label={t("set.pw.confirm")}>
           <input
             type="password"
             value={confirmPw}
@@ -269,7 +394,7 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
           disabled={savingPw}
           className={`${buttonPrimary} w-full`}
         >
-          {savingPw ? "กำลังเปลี่ยน..." : "เปลี่ยนรหัสผ่าน"}
+          {savingPw ? t("set.pw.submitting") : t("set.pw.submit")}
         </button>
       </form>
     </div>

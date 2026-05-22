@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useToast } from "@/components/toast";
+import { useT } from "@/lib/i18n/I18nProvider";
 import type { Order } from "@/lib/types";
 
 interface UseTableOrdersOptions {
@@ -17,6 +18,7 @@ export function useTableOrders({
   tableId,
 }: UseTableOrdersOptions): Order[] {
   const toast = useToast();
+  const { t } = useT();
   const [orders, setOrders] = useState<Order[]>([]);
 
   useEffect(() => {
@@ -60,17 +62,17 @@ export function useTableOrders({
             prev.map((o) => (o.id === next.id ? next : o)),
           );
           if (old.status !== "ready" && next.status === "ready") {
-            toast.success("ออเดอร์ของคุณพร้อมเสิร์ฟแล้ว!");
+            toast.success(t("cust.realtime.ready"));
           }
           if (old.status !== "cancelled" && next.status === "cancelled") {
             toast.error(
               next.cancel_reason
-                ? `ออเดอร์ถูกยกเลิก: ${next.cancel_reason}`
-                : "ออเดอร์ถูกยกเลิกโดยร้าน",
+                ? t("cust.realtime.cancelled", { reason: next.cancel_reason })
+                : t("cust.realtime.cancelled_no_reason"),
             );
           }
           if (!old.paid && next.paid) {
-            toast.success("รับชำระเรียบร้อย ขอบคุณครับ");
+            toast.success(t("cust.realtime.paid"));
           }
         },
       )
@@ -93,7 +95,7 @@ export function useTableOrders({
       cancelled = true;
       void supabase.removeChannel(channel);
     };
-  }, [supabase, restaurantId, tableId, toast]);
+  }, [supabase, restaurantId, tableId, toast, t]);
 
   return orders;
 }

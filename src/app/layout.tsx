@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/toast";
 import { ConfirmProvider } from "@/components/ConfirmDialog";
+import { I18nProvider } from "@/lib/i18n/I18nProvider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -43,9 +44,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className="min-h-screen bg-canvas font-sans text-ink antialiased"
         suppressHydrationWarning
       >
-        <ToastProvider>
-          <ConfirmProvider>{children}</ConfirmProvider>
-        </ToastProvider>
+        <I18nProvider>
+          <ToastProvider>
+            <ConfirmProvider>{children}</ConfirmProvider>
+          </ToastProvider>
+        </I18nProvider>
       </body>
     </html>
   );

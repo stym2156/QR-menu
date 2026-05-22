@@ -1,6 +1,13 @@
+import { redirect } from "next/navigation";
+import NoShopMessage from "@/components/NoShopMessage";
 import { createClient } from "@/lib/supabase/server";
+import {
+  canManageTables,
+  canSeeTables,
+  getCurrentMembership,
+} from "@/lib/membership";
 import TableManager from "./TableManager";
-import { PageHeader } from "@/components/ui";
+import I18nPageHeader from "@/components/I18nPageHeader";
 import type { DiningTable } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -13,31 +20,32 @@ export default async function TablesPage() {
 
   if (!user) return null;
 
-  const { data: restaurant } = await supabase
-    .from("restaurants")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!restaurant) {
+  const membership = await getCurrentMembership(supabase);
+  if (!membership) {
     return <p className="text-muted">ยังไม่มีร้าน — กรุณา signup ใหม่</p>;
   }
+  if (!canSeeTables(membership.role)) redirect("/dashboard");
 
   const { data: tables } = await supabase
     .from("tables")
     .select("*")
-    .eq("restaurant_id", restaurant.id)
+    .eq("restaurant_id", membership.restaurantId)
     .order("table_number", { ascending: true });
 
   return (
     <div>
-      <PageHeader
-        title="โต๊ะ & QR Code"
-        description="สร้าง QR สำหรับแต่ละโต๊ะ ลูกค้าสแกนเพื่อสั่งอาหาร"
+      <I18nPageHeader
+        titleKey="page.tables.title"
+        descKey={
+          canManageTables(membership.role)
+            ? "page.tables.desc.owner"
+            : "page.tables.desc.waiter"
+        }
       />
       <TableManager
-        restaurantId={restaurant.id}
+        restaurantId={membership.restaurantId}
         initialTables={(tables ?? []) as DiningTable[]}
+        canManage={canManageTables(membership.role)}
       />
     </div>
   );

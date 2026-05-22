@@ -12,6 +12,7 @@ import {
   input,
 } from "@/components/ui";
 import { useToast } from "@/components/toast";
+import { useT } from "@/lib/i18n/I18nProvider";
 import { formatDateTime } from "@/lib/format";
 import type { Feedback, FeedbackCategory } from "@/lib/types";
 
@@ -23,26 +24,22 @@ interface Props {
   initialFeedback: Feedback[];
 }
 
-const CATEGORIES: { value: FeedbackCategory; label: string; icon: string }[] = [
-  { value: "bug", label: "Bug / ปัญหา", icon: "🐞" },
-  { value: "feature", label: "ขอ feature", icon: "✨" },
-  { value: "question", label: "สอบถาม", icon: "❓" },
-  { value: "general", label: "ทั่วไป", icon: "💬" },
+const CATEGORY_KEYS: { value: FeedbackCategory; key: string; icon: string }[] = [
+  { value: "bug", key: "fb.cat.bug_long", icon: "🐞" },
+  { value: "feature", key: "fb.cat.feature_long", icon: "✨" },
+  { value: "question", key: "fb.cat.question_long", icon: "❓" },
+  { value: "general", key: "fb.cat.general", icon: "💬" },
 ];
-
-const CATEGORY_LABEL: Record<FeedbackCategory, string> = Object.fromEntries(
-  CATEGORIES.map((c) => [c.value, c.label]),
-) as Record<FeedbackCategory, string>;
 
 export default function FeedbackView({
   userId,
   userEmail,
   restaurantId,
-  restaurantName,
   initialFeedback,
 }: Props) {
   const supabase = createClient();
   const toast = useToast();
+  const { t } = useT();
 
   const [feedbackList, setFeedbackList] = useState<Feedback[]>(initialFeedback);
   const [category, setCategory] = useState<FeedbackCategory>("general");
@@ -51,16 +48,21 @@ export default function FeedbackView({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function categoryLabel(c: FeedbackCategory): string {
+    const item = CATEGORY_KEYS.find((x) => x.value === c);
+    return item ? t(item.key) : c;
+  }
+
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     setError(null);
     const trimmed = message.trim();
     if (trimmed.length < 5) {
-      setError("ข้อความสั้นเกินไป (อย่างน้อย 5 ตัวอักษร)");
+      setError(t("fb.error.short"));
       return;
     }
     if (trimmed.length > 2000) {
-      setError("ข้อความยาวเกินไป (ไม่เกิน 2,000 ตัวอักษร)");
+      setError(t("fb.error.long"));
       return;
     }
     setBusy(true);
@@ -80,14 +82,14 @@ export default function FeedbackView({
     setBusy(false);
 
     if (insertError || !data) {
-      setError(`ส่งไม่สำเร็จ: ${insertError?.message ?? "unknown"}`);
+      setError(t("fb.failed_short", { error: insertError?.message ?? "unknown" }));
       return;
     }
 
     setFeedbackList((prev) => [data as Feedback, ...prev]);
     setMessage("");
     setCategory("general");
-    toast.success("ส่งข้อความเรียบร้อย ขอบคุณครับ");
+    toast.success(t("fb.submit_thanks"));
   }
 
   return (
@@ -96,9 +98,9 @@ export default function FeedbackView({
         onSubmit={handleSubmit}
         className={`${card} ${cardPad} h-fit space-y-4 lg:sticky lg:top-20`}
       >
-        <FormField label="">
+        <FormField label={t("fb.cat")}>
           <div className="grid grid-cols-2 gap-2">
-            {CATEGORIES.map((c) => (
+            {CATEGORY_KEYS.map((c) => (
               <button
                 key={c.value}
                 type="button"
@@ -110,13 +112,13 @@ export default function FeedbackView({
                 }`}
               >
                 <span className="text-base">{c.icon}</span>
-                <span>{c.label}</span>
+                <span>{t(c.key)}</span>
               </button>
             ))}
           </div>
         </FormField>
 
-        <FormField label="ข้อความ" hint="5 – 2,000 ตัวอักษร">
+        <FormField label={t("fb.message")} hint={t("fb.message.hint")}>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
@@ -130,7 +132,7 @@ export default function FeedbackView({
           </div>
         </FormField>
 
-        <FormField label="อีเมลที่ติดต่อกลับ" hint="ไม่บังคับ — ถ้าอยากให้ตอบกลับ">
+        <FormField label={t("fb.contact_email")} hint={t("fb.contact_email.hint")}>
           <input
             type="email"
             value={email}
@@ -151,19 +153,19 @@ export default function FeedbackView({
           disabled={busy}
           className={`${buttonPrimary} w-full`}
         >
-          {busy ? "กำลังส่ง..." : "ส่งข้อความ"}
+          {busy ? t("fb.submitting") : t("fb.submit")}
         </button>
       </form>
 
       <div className="space-y-3">
         <SectionHeading
-          title="ประวัติข้อความที่คุณส่ง"
-          description={`${feedbackList.length} รายการ (แสดง 20 ล่าสุด)`}
+          title={t("fb.history.title")}
+          description={t("fb.history.count", { n: feedbackList.length })}
         />
 
         {feedbackList.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-line bg-surface/50 p-12 text-center text-sm text-muted">
-            ยังไม่เคยส่งข้อความ
+            {t("fb.history.empty")}
           </div>
         ) : (
           <ul className="space-y-2">
@@ -175,12 +177,12 @@ export default function FeedbackView({
                 <div className="mb-1.5 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-medium text-ink">
-                      {CATEGORY_LABEL[fb.category] ?? fb.category}
+                      {categoryLabel(fb.category)}
                     </span>
                     {fb.resolved ? (
-                      <StatusPill tone="success">แก้ไขแล้ว</StatusPill>
+                      <StatusPill tone="success">{t("fb.resolved")}</StatusPill>
                     ) : (
-                      <StatusPill tone="warning">รอตรวจสอบ</StatusPill>
+                      <StatusPill tone="warning">{t("fb.pending_label")}</StatusPill>
                     )}
                   </div>
                   <span className="text-[11px] text-muted">

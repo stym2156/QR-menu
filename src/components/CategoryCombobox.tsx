@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { useT } from "@/lib/i18n/I18nProvider";
 import type { Category } from "@/lib/types";
 
 interface CategoryComboboxProps {
@@ -17,9 +18,11 @@ export default function CategoryCombobox({
   onChange,
   categories,
   onCreate,
-  placeholder = "พิมพ์เพื่อค้นหา...",
+  placeholder,
   variant = "default",
 }: CategoryComboboxProps) {
+  const { t } = useT();
+  const ph = placeholder ?? t("combobox.placeholder_search");
   const id = useId();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -131,7 +134,7 @@ export default function CategoryCombobox({
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
-        placeholder={selected ? selected.name : placeholder}
+        placeholder={selected ? selected.name : ph}
         className={inputClass}
         autoComplete="off"
       />
@@ -139,7 +142,7 @@ export default function CategoryCombobox({
       {open && (
         <div className="absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border border-line bg-surface shadow-pop">
           <Row
-            label="— ไม่มีหมวด —"
+            label={t("combobox.none")}
             muted
             active={highlightIdx === 0}
             onSelect={() => selectRow(0)}
@@ -149,7 +152,7 @@ export default function CategoryCombobox({
 
           {filtered.length === 0 && !q ? (
             <div className="px-3 py-2.5 text-xs italic text-muted">
-              ยังไม่มีหมวดหมู่
+              {t("combobox.no_cats")}
             </div>
           ) : null}
 
@@ -169,14 +172,16 @@ export default function CategoryCombobox({
 
           {filtered.length === 0 && q && !canCreate ? (
             <div className="px-3 py-2.5 text-xs italic text-muted">
-              ไม่เจอ &quot;{query}&quot;
+              {t("combobox.no_match", { q: query })}
             </div>
           ) : null}
 
           {canCreate ? (
             <Row
               label={
-                creating ? `กำลังสร้าง "${query}"...` : `+ สร้างหมวด "${query}"`
+                creating
+                  ? t("combobox.creating_q", { q: query })
+                  : t("combobox.create_q", { q: query })
               }
               active={highlightIdx === 1 + filtered.length}
               onSelect={() => selectRow(1 + filtered.length)}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/lib/i18n/I18nProvider";
 import { callStaff } from "../actions";
 import { Sheet } from "./Sheet";
 
@@ -15,10 +16,18 @@ export function CallStaffModal({
   tableId,
   onClose,
 }: CallStaffModalProps) {
+  const { t } = useT();
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const presets = [
+    t("cust.call.preset.water"),
+    t("cust.call.preset.utensils"),
+    t("cust.call.preset.tissue"),
+    t("cust.call.preset.bill"),
+  ];
 
   async function submit(presetReason?: string): Promise<void> {
     setBusy(true);
@@ -30,7 +39,7 @@ export function CallStaffModal({
       reason: text.trim() || null,
     });
     if (!result.ok) {
-      setError(`เรียกไม่สำเร็จ: ${result.error}`);
+      setError(t("cust.call.failed", { error: result.error ?? "" }));
       setBusy(false);
       return;
     }
@@ -40,19 +49,19 @@ export function CallStaffModal({
   }
 
   return (
-    <Sheet onClose={onClose} title="เรียกพนักงาน">
+    <Sheet onClose={onClose} title={t("cust.call_staff.title")}>
       {done ? (
         <div className="py-12 text-center">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-2xl">
             ✓
           </div>
-          <p className="font-medium text-ink">เรียกพนักงานแล้ว</p>
-          <p className="mt-1 text-sm text-muted">กำลังไปเดี๋ยวนี้</p>
+          <p className="font-medium text-ink">{t("cust.call.done")}</p>
+          <p className="mt-1 text-sm text-muted">{t("cust.call.coming")}</p>
         </div>
       ) : (
         <div className="space-y-4 py-3">
           <div className="grid grid-cols-2 gap-2">
-            {["ขอน้ำเพิ่ม", "ขอช้อนส้อม", "ขอกระดาษ", "ขอเช็คบิล"].map((preset) => (
+            {presets.map((preset) => (
               <button
                 key={preset}
                 onClick={() => submit(preset)}
@@ -66,14 +75,16 @@ export function CallStaffModal({
 
           <div className="flex items-center gap-2">
             <div className="h-px flex-1 bg-line" />
-            <span className="text-xs uppercase tracking-wider text-muted">หรือ</span>
+            <span className="text-xs uppercase tracking-wider text-muted">
+              {t("cust.call.or")}
+            </span>
             <div className="h-px flex-1 bg-line" />
           </div>
 
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="พิมพ์ที่ต้องการ..."
+            placeholder={t("cust.call.placeholder")}
             maxLength={200}
             rows={2}
             className="w-full rounded-xl border border-line bg-canvas px-3 py-2.5 text-sm text-ink placeholder:text-muted focus:border-ink focus:bg-surface focus:outline-none"
@@ -88,7 +99,7 @@ export function CallStaffModal({
             disabled={busy}
             className="w-full rounded-xl bg-accent-600 px-4 py-3 text-sm font-medium text-surface shadow-ink transition hover:bg-accent-700 disabled:opacity-50"
           >
-            {busy ? "กำลังส่ง..." : "เรียกพนักงาน"}
+            {busy ? t("cust.sending") : t("cust.call_staff.submit")}
           </button>
         </div>
       )}

@@ -1,25 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   EmptyState,
-  FormField,
+  SectionHeading,
   buttonPrimary,
+  buttonSecondary,
   card,
   cardPad,
-  input,
 } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/toast";
+import { useT } from "@/lib/i18n/I18nProvider";
 import { formatDateTime } from "@/lib/format";
 
 interface Member {
   id: string;
   user_id: string;
-  role: "owner" | "staff";
+  role: "owner" | "staff" | "cook" | "waiter";
   invited_email: string | null;
   created_at: string;
+}
+
+interface Invite {
+  id: string;
+  token: string;
+  role: "cook" | "waiter";
+  created_at: string;
+  used_at: string | null;
+  used_by: string | null;
+  revoked_at: string | null;
 }
 
 interface Props {
@@ -27,6 +38,20 @@ interface Props {
   currentUserId: string;
   initialMembers: Member[];
 }
+
+const ROLE_KEY: Record<Member["role"], string> = {
+  owner: "staff.role.owner_label",
+  staff: "staff.role.staff_label",
+  cook: "role.cook",
+  waiter: "role.waiter",
+};
+
+const ROLE_COLOR: Record<Member["role"], string> = {
+  owner: "bg-ink text-surface",
+  staff: "bg-emerald-50 text-emerald-700",
+  cook: "bg-amber-50 text-amber-700",
+  waiter: "bg-sky-50 text-sky-700",
+};
 
 export default function StaffManager({
   restaurantId,
@@ -36,86 +61,117 @@ export default function StaffManager({
   const supabase = createClient();
   const confirm = useConfirm();
   const toast = useToast();
+  const { t } = useT();
   const [members, setMembers] = useState<Member[]>(initialMembers);
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [invites, setInvites] = useState<Invite[]>([]);
+  const [origin, setOrigin] = useState("");
+  const [creatingRole, setCreatingRole] = useState<"cook" | "waiter" | null>(null);
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
-  async function handleInvite(e: React.FormEvent): Promise<void> {
-    e.preventDefault();
-    setError(null);
-    const trimmed = email.trim().toLowerCase();
-    if (!trimmed || !/^[^@]+@[^@]+\.[^@]+$/.test(trimmed)) {
-      setError("กรุณาใส่อีเมลให้ถูกต้อง");
-      return;
-    }
-    setBusy(true);
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
 
-    // Find user by email via Supabase. Users must already have an account.
-    // We can't query auth.users from client; instead store invited_email and
-    // resolve later via a database trigger or admin-side script.
-    // For now: insert a placeholder row that admins can match manually,
-    // or use a real lookup via a server action.
-    // Simpler: look up via Supabase's identities table if accessible — not
-    // available client-side. We'll require the user to already exist and
-    // owner to know their user_id. As a stopgap, we'll insert with
-    // invited_email and ask user to share signup link with staff.
+  useEffect(() => {
+    void loadInvites();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurantId]);
 
-    // Real lookup via SQL function call:
-    const { data: lookup, error: lookupErr } = await supabase
-      .rpc("find_user_id_by_email", { email_input: trimmed })
-      .single();
+  async function loadInvites(): Promise<void> {
+    const { data } = await supabase
+      .from("restaurant_invites")
+      .select("id, token, role, created_at, used_at, used_by, revoked_at")
+      .eq("restaurant_id", restaurantId)
+      .order("created_at", { ascending: false });
+    setInvites((data ?? []) as Invite[]);
+  }
 
-    if (lookupErr || !lookup) {
-      setError(
-        "ไม่พบบัญชีของอีเมลนี้ — แจ้งให้ทีมงานสมัครที่ /signup ก่อน แล้วจึงเพิ่มที่นี่",
-      );
-      setBusy(false);
-      return;
-    }
+  function makeToken(): string {
+    // 24-char URL-safe random token. Uses crypto for entropy.
+    const bytes = new Uint8Array(18);
+    crypto.getRandomValues(bytes);
+    return btoa(String.fromCharCode(...bytes))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+  }
 
-    const userId = (lookup as { user_id: string }).user_id;
-
-    const { data: inserted, error: insertErr } = await supabase
-      .from("restaurant_members")
+  async function createInvite(role: "cook" | "waiter"): Promise<void> {
+    setCreatingRole(role);
+    const token = makeToken();
+    const { data, error } = await supabase
+      .from("restaurant_invites")
       .insert({
         restaurant_id: restaurantId,
-        user_id: userId,
-        role: "staff",
-        invited_email: trimmed,
+        token,
+        role,
+        created_by: currentUserId,
       })
-      .select()
+      .select("id, token, role, created_at, used_at, used_by, revoked_at")
       .single();
-
-    setBusy(false);
-
-    if (insertErr || !inserted) {
-      if (insertErr?.code === "23505") {
-        setError("อีเมลนี้เป็นพนักงานอยู่แล้ว");
-      } else {
-        setError(`เพิ่มไม่สำเร็จ: ${insertErr?.message ?? "unknown"}`);
-      }
+    setCreatingRole(null);
+    if (error || !data) {
+      toast.error(t("staff.create.failed", { error: error?.message ?? "unknown" }));
       return;
     }
+    setInvites((prev) => [data as Invite, ...prev]);
+    const url = `${origin}/join/${(data as Invite).token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(t("staff.created.copied"));
+    } catch {
+      toast.success(t("staff.created.fallback"));
+    }
+  }
 
-    setMembers((prev) => [...prev, inserted as Member]);
-    setEmail("");
-    toast.success(`เพิ่ม ${trimmed} เป็นพนักงานแล้ว`);
+  async function copyInvite(invite: Invite): Promise<void> {
+    const url = `${origin}/join/${invite.token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedToken(invite.token);
+      setTimeout(() => setCopiedToken(null), 1500);
+    } catch {
+      toast.error(t("staff.copy_failed"));
+    }
+  }
+
+  async function revokeInvite(invite: Invite): Promise<void> {
+    const ok = await confirm({
+      title: t("staff.revoke.title"),
+      description: t("staff.revoke.desc"),
+      confirmText: t("staff.revoke.confirm"),
+      tone: "danger",
+    });
+    if (!ok) return;
+    const now = new Date().toISOString();
+    setInvites((prev) =>
+      prev.map((i) => (i.id === invite.id ? { ...i, revoked_at: now } : i)),
+    );
+    const { error } = await supabase
+      .from("restaurant_invites")
+      .update({ revoked_at: now })
+      .eq("id", invite.id);
+    if (error) {
+      toast.error(t("staff.revoke.failed", { error: error.message }));
+      void loadInvites();
+      return;
+    }
+    toast.success(t("staff.revoked"));
   }
 
   async function removeMember(m: Member): Promise<void> {
     if (m.role === "owner") {
-      toast.error("ลบเจ้าของร้านไม่ได้");
+      toast.error(t("staff.remove.cant_owner"));
       return;
     }
     if (m.user_id === currentUserId) {
-      toast.error("ลบตัวเองไม่ได้");
+      toast.error(t("staff.remove.cant_self"));
       return;
     }
     const ok = await confirm({
-      title: `ลบพนักงาน "${m.invited_email ?? m.user_id}" ออก?`,
-      description: "พนักงานจะไม่สามารถเข้าใช้ระบบของร้านนี้ได้อีก",
-      confirmText: "ลบออก",
+      title: t("staff.remove.title", { name: m.invited_email ?? m.user_id }),
+      description: t("staff.remove.desc"),
+      confirmText: t("staff.remove.confirm"),
       tone: "danger",
     });
     if (!ok) return;
@@ -124,46 +180,90 @@ export default function StaffManager({
       .from("restaurant_members")
       .delete()
       .eq("id", m.id);
-    if (error) toast.error(`ลบไม่สำเร็จ: ${error.message}`);
-    else toast.success("ลบพนักงานแล้ว");
+    if (error) toast.error(t("staff.remove.failed", { error: error.message }));
+    else toast.success(t("staff.removed"));
   }
 
+  const activeInvites = invites.filter((i) => !i.used_at && !i.revoked_at);
+
   return (
-    <div className={`${card} ${cardPad} space-y-5`}>
-      <form onSubmit={handleInvite} className="space-y-3">
-        <FormField
-          label="เพิ่มพนักงานจากอีเมล"
-          hint="ทีมงานต้องสมัครบัญชีที่ /signup ก่อน แล้วเอาอีเมลนั้นมาใส่ที่นี่"
-        >
-          <div className="flex gap-2">
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="staff@example.com"
-              className={`${input} flex-1`}
-            />
-            <button
-              type="submit"
-              disabled={busy}
-              className={`${buttonPrimary} shrink-0`}
-            >
-              {busy ? "..." : "เพิ่ม"}
-            </button>
+    <div className="space-y-5">
+      <div className={`${card} ${cardPad} space-y-4`}>
+        <SectionHeading
+          title={t("staff.create.title")}
+          description={t("staff.create.desc")}
+        />
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => createInvite("cook")}
+            disabled={creatingRole !== null}
+            className={`${buttonPrimary} py-3`}
+          >
+            {creatingRole === "cook" ? t("staff.creating") : t("staff.create.cook")}
+          </button>
+          <button
+            type="button"
+            onClick={() => createInvite("waiter")}
+            disabled={creatingRole !== null}
+            className={`${buttonPrimary} py-3`}
+          >
+            {creatingRole === "waiter" ? t("staff.creating") : t("staff.create.waiter")}
+          </button>
+        </div>
+
+        {activeInvites.length > 0 ? (
+          <div className="space-y-2 border-t border-line pt-4">
+            <div className="text-xs font-medium uppercase tracking-wider text-muted">
+              {t("staff.active.title", { n: activeInvites.length })}
+            </div>
+            <ul className="space-y-2">
+              {activeInvites.map((invite) => {
+                const url = `${origin}/join/${invite.token}`;
+                return (
+                  <li
+                    key={invite.id}
+                    className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-canvas/40 px-3 py-2.5"
+                  >
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${
+                        invite.role === "cook"
+                          ? "bg-amber-50 text-amber-700"
+                          : "bg-sky-50 text-sky-700"
+                      }`}
+                    >
+                      {t(ROLE_KEY[invite.role])}
+                    </span>
+                    <code className="min-w-0 flex-1 truncate text-[11px] text-muted">
+                      {url}
+                    </code>
+                    <button
+                      onClick={() => void copyInvite(invite)}
+                      className={`${buttonSecondary} shrink-0 py-1.5 text-xs`}
+                    >
+                      {copiedToken === invite.token ? t("staff.copied") : t("staff.copy")}
+                    </button>
+                    <button
+                      onClick={() => void revokeInvite(invite)}
+                      className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted transition hover:bg-red-50 hover:text-red-600"
+                    >
+                      {t("staff.revoke")}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
-        </FormField>
-
-        {error ? (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </p>
         ) : null}
-      </form>
+      </div>
 
-      <div className="border-t border-line pt-4">
+      <div className={`${card} ${cardPad}`}>
+        <SectionHeading
+          title={t("staff.members.title")}
+          description={t("staff.members.count", { n: members.length })}
+        />
         {members.length === 0 ? (
-          <EmptyState title="ยังไม่มีพนักงาน" />
+          <EmptyState title={t("staff.members.empty")} />
         ) : (
           <ul className="space-y-2">
             {members.map((m) => (
@@ -177,25 +277,21 @@ export default function StaffManager({
                       {m.invited_email ?? m.user_id}
                     </span>
                     <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${
-                        m.role === "owner"
-                          ? "bg-ink text-surface"
-                          : "bg-emerald-50 text-emerald-700"
-                      }`}
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ${ROLE_COLOR[m.role]}`}
                     >
-                      {m.role === "owner" ? "เจ้าของ" : "พนักงาน"}
+                      {t(ROLE_KEY[m.role])}
                     </span>
                   </div>
                   <div className="text-[11px] text-muted">
-                    เพิ่มเมื่อ {formatDateTime(m.created_at)}
+                    {t("staff.added_at", { time: formatDateTime(m.created_at) })}
                   </div>
                 </div>
-                {m.role === "staff" && m.user_id !== currentUserId ? (
+                {m.role !== "owner" && m.user_id !== currentUserId ? (
                   <button
                     onClick={() => removeMember(m)}
                     className="rounded-lg px-2 py-1 text-xs font-medium text-muted transition hover:bg-red-50 hover:text-red-600"
                   >
-                    ลบ
+                    {t("common.delete")}
                   </button>
                 ) : null}
               </li>

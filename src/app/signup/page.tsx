@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useT } from "@/lib/i18n/I18nProvider";
+import { LanguageSwitcher } from "@/lib/i18n/LanguageSwitcher";
 import {
   FormField,
   buttonPrimary,
@@ -15,6 +17,7 @@ import {
 export default function SignupPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { t } = useT();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [restaurantName, setRestaurantName] = useState("");
@@ -43,15 +46,13 @@ export default function SignupPage() {
     }
 
     if (!data.user) {
-      setError("Signup ไม่สำเร็จ ลองใหม่อีกครั้ง");
+      setError(t("auth.signup.failed"));
       setLoading(false);
       return;
     }
 
     if (!data.session) {
-      setInfo(
-        "สมัครสำเร็จ! กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชี แล้วเข้าสู่ระบบ",
-      );
+      setInfo(t("auth.signup.verify_email"));
       setLoading(false);
       return;
     }
@@ -62,44 +63,52 @@ export default function SignupPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5 py-12">
-      <Link
-        href="/"
-        className="mb-8 inline-flex items-center gap-2 self-center text-base font-semibold tracking-tight text-ink"
-      >
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-ink text-xs font-bold text-surface">
-          Q
-        </span>
-        QR Menu
-      </Link>
+      <div className="mb-8 flex items-center justify-between">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-base font-semibold tracking-tight text-ink"
+        >
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-ink text-xs font-bold text-surface">
+            Q
+          </span>
+          QR Menu
+        </Link>
+        <LanguageSwitcher variant="compact" />
+      </div>
 
       <div className={`${card} ${cardPad}`}>
-        <h1 className="text-xl font-semibold tracking-tight text-ink">เปิดร้านใหม่</h1>
-        <p className="mt-1 text-sm text-muted">สมัครสมาชิกฟรี ใช้งานได้ทันที</p>
+        <h1 className="text-xl font-semibold tracking-tight text-ink">
+          {t("auth.signup.title")}
+        </h1>
+        <p className="mt-1 text-sm text-muted">{t("auth.signup.subtitle")}</p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <FormField label="ชื่อร้าน">
+          <FormField label={t("auth.field.shop_name")}>
             <input
               type="text"
               value={restaurantName}
               onChange={(e) => setRestaurantName(e.target.value)}
               required
               className={input}
-              placeholder="ร้านอาหารของคุณ"
+              placeholder={t("auth.field.shop_name.placeholder")}
             />
           </FormField>
 
-          <FormField label="อีเมล">
+          <FormField label={t("auth.field.email")}>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               className={input}
-              placeholder="you@example.com"
+              placeholder={t("auth.field.email.placeholder")}
             />
           </FormField>
 
-          <FormField label="รหัสผ่าน" hint="อย่างน้อย 6 ตัวอักษร">
+          <FormField
+            label={t("auth.field.password")}
+            hint={t("auth.field.password.hint")}
+          >
             <input
               type="password"
               value={password}
@@ -128,15 +137,15 @@ export default function SignupPage() {
             disabled={loading}
             className={`${buttonPrimary} w-full`}
           >
-            {loading ? "กำลังสมัคร..." : "สมัครสมาชิก"}
+            {loading ? t("auth.signup.submitting") : t("auth.signup.submit")}
           </button>
         </form>
       </div>
 
       <p className="mt-6 text-center text-sm text-muted">
-        มีบัญชีอยู่แล้ว?{" "}
+        {t("auth.signup.has_account")}{" "}
         <Link href="/login" className="font-medium text-ink hover:underline">
-          เข้าสู่ระบบ
+          {t("auth.signup.login_link")}
         </Link>
       </p>
     </main>

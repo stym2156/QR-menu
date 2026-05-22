@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n/I18nProvider";
 import { useSound } from "./SoundProvider";
 
 /**
@@ -8,12 +9,14 @@ import { useSound } from "./SoundProvider";
  */
 export function SoundToggle() {
   const { soundOn, toggle } = useSound();
+  const { t } = useT();
+  const label = soundOn ? t("sound.off") : t("sound.on");
 
   return (
     <button
       onClick={toggle}
-      aria-label={soundOn ? "ปิดเสียงแจ้งเตือน" : "เปิดเสียงแจ้งเตือน"}
-      title={soundOn ? "ปิดเสียงแจ้งเตือน" : "เปิดเสียงแจ้งเตือน"}
+      aria-label={label}
+      title={label}
       className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition ${
         soundOn
           ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"

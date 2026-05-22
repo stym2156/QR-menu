@@ -1,6 +1,9 @@
+import { redirect } from "next/navigation";
+import NoShopMessage from "@/components/NoShopMessage";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentMembership, isOwner } from "@/lib/membership";
 import PromotionManager from "./PromotionManager";
-import { PageHeader } from "@/components/ui";
+import I18nPageHeader from "@/components/I18nPageHeader";
 import type { Promotion } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -13,31 +16,27 @@ export default async function PromotionsPage() {
 
   if (!user) return null;
 
-  const { data: restaurant } = await supabase
-    .from("restaurants")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (!restaurant) {
+  const membership = await getCurrentMembership(supabase);
+  if (!membership) {
     return <p className="text-muted">ยังไม่มีร้าน — กรุณา signup ใหม่</p>;
   }
+  if (!isOwner(membership.role)) redirect("/dashboard");
 
   const { data: promotions } = await supabase
     .from("promotions")
     .select("*")
-    .eq("restaurant_id", restaurant.id)
+    .eq("restaurant_id", membership.restaurantId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });
 
   return (
     <div>
-      <PageHeader
-        title="โปรโมชัน"
-        description="แสดงบนหน้าลูกค้า · เปิด/ปิดได้ตลอด · เก็บไว้ใช้รอบหน้าได้"
+      <I18nPageHeader
+        titleKey="page.promotions.title"
+        descKey="page.promotions.desc"
       />
       <PromotionManager
-        restaurantId={restaurant.id}
+        restaurantId={membership.restaurantId}
         initialPromotions={(promotions ?? []) as Promotion[]}
       />
     </div>

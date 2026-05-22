@@ -1,7 +1,9 @@
+import { redirect } from "next/navigation";
+import NoShopMessage from "@/components/NoShopMessage";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentMembership } from "@/lib/membership";
+import { canSeeBills, getCurrentMembership } from "@/lib/membership";
 import BillsView from "./BillsView";
-import { PageHeader } from "@/components/ui";
+import I18nPageHeader from "@/components/I18nPageHeader";
 import type { DiningTable, Menu, Order } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -18,10 +20,11 @@ export default async function BillsPage() {
   if (!membership) {
     return <p className="text-muted">ยังไม่มีร้าน — กรุณา signup ใหม่</p>;
   }
+  if (!canSeeBills(membership.role)) redirect("/dashboard");
 
   const { data: restaurant } = await supabase
     .from("restaurants")
-    .select("id, name, service_charge_pct, vat_pct")
+    .select("id, name, service_charge_pct, vat_pct, payment_qr_url")
     .eq("id", membership.restaurantId)
     .maybeSingle();
 
@@ -29,7 +32,17 @@ export default async function BillsPage() {
     return <p className="text-muted">ไม่พบข้อมูลร้าน</p>;
   }
 
-  const [{ data: orders }, { data: tables }, { data: menus }] = await Promise.all([
+  // Settled-bills history window — 30 days back is plenty for the bills view
+  // (older history lives on the stats page).
+  const since = new Date();
+  since.setDate(since.getDate() - 30);
+
+  const [
+    { data: orders },
+    { data: settledOrders },
+    { data: tables },
+    { data: menus },
+  ] = await Promise.all([
     supabase
       .from("orders")
       .select("*")
@@ -37,6 +50,13 @@ export default async function BillsPage() {
       .eq("paid", false)
       .neq("status", "cancelled")
       .order("created_at", { ascending: true }),
+    supabase
+      .from("orders")
+      .select("*")
+      .eq("restaurant_id", restaurant.id)
+      .eq("paid", true)
+      .gte("paid_at", since.toISOString())
+      .order("paid_at", { ascending: false }),
     supabase
       .from("tables")
       .select("*")
@@ -47,16 +67,15 @@ export default async function BillsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="เช็คบิล"
-        description="คลิกที่โต๊ะเพื่อรับชำระทั้งบิลในคลิกเดียว"
-      />
+      <I18nPageHeader titleKey="page.bills.title" descKey="page.bills.desc" />
       <BillsView
         restaurantId={restaurant.id}
         restaurantName={restaurant.name}
         serviceChargePct={Number(restaurant.service_charge_pct) || 0}
         vatPct={Number(restaurant.vat_pct) || 0}
+        paymentQrUrl={restaurant.payment_qr_url ?? null}
         initialOrders={(orders ?? []) as Order[]}
+        initialSettledOrders={(settledOrders ?? []) as Order[]}
         tables={(tables ?? []) as DiningTable[]}
         menus={(menus ?? []) as Menu[]}
       />

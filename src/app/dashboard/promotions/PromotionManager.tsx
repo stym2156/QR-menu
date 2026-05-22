@@ -15,6 +15,8 @@ import {
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/toast";
 import { compressImage } from "@/lib/image";
+import { randomId } from "@/lib/uuid";
+import { useT } from "@/lib/i18n/I18nProvider";
 import type { Promotion } from "@/lib/types";
 
 interface Props {
@@ -29,6 +31,7 @@ export default function PromotionManager({
   const supabase = createClient();
   const confirm = useConfirm();
   const toast = useToast();
+  const { t } = useT();
   const [promotions, setPromotions] = useState<Promotion[]>(initialPromotions);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -44,13 +47,13 @@ export default function PromotionManager({
     if (!file) return null;
     const compressed = await compressImage(file).catch(() => file);
     const ext = compressed.name.split(".").pop() ?? "jpg";
-    const path = `${restaurantId}/${crypto.randomUUID()}.${ext}`;
+    const path = `${restaurantId}/${randomId()}.${ext}`;
     const { error: uploadError } = await supabase.storage
       .from("promotion-images")
       .upload(path, compressed, { cacheControl: "3600", upsert: false });
 
     if (uploadError) {
-      setError(`อัปโหลดรูปไม่สำเร็จ: ${uploadError.message}`);
+      setError(t("promo.upload_failed", { error: uploadError.message }));
       return null;
     }
 
@@ -91,7 +94,7 @@ export default function PromotionManager({
       .single();
 
     if (insertError || !data) {
-      setError(`เพิ่มโปรไม่สำเร็จ: ${insertError?.message}`);
+      setError(t("promo.add_failed", { error: insertError?.message ?? "" }));
       setBusy(false);
       return;
     }
@@ -118,16 +121,16 @@ export default function PromotionManager({
 
   async function deletePromotion(promotion: Promotion): Promise<void> {
     const ok = await confirm({
-      title: `ลบโปรโมชัน "${promotion.title}"?`,
-      description: "การกระทำนี้ย้อนกลับไม่ได้",
-      confirmText: "ลบ",
+      title: t("promo.delete.title", { name: promotion.title }),
+      description: t("promo.delete.desc"),
+      confirmText: t("common.delete"),
       tone: "danger",
     });
     if (!ok) return;
     setPromotions((prev) => prev.filter((p) => p.id !== promotion.id));
     const { error } = await supabase.from("promotions").delete().eq("id", promotion.id);
-    if (error) toast.error(`ลบไม่สำเร็จ: ${error.message}`);
-    else toast.success("ลบโปรโมชันแล้ว");
+    if (error) toast.error(t("promo.delete_failed", { error: error.message }));
+    else toast.success(t("promo.deleted"));
   }
 
   const activeCount = promotions.filter((p) => p.active).length;
@@ -138,9 +141,9 @@ export default function PromotionManager({
         onSubmit={handleAdd}
         className={`${card} ${cardPad} h-fit space-y-4 lg:sticky lg:top-20`}
       >
-        <SectionHeading title="เพิ่มโปรโมชัน" />
+        <SectionHeading title={t("promo.add_title")} />
 
-        <FormField label="หัวเรื่อง">
+        <FormField label={t("promo.title_field")}>
           <input
             type="text"
             value={title}
@@ -148,28 +151,24 @@ export default function PromotionManager({
             required
             maxLength={80}
             className={input}
-            placeholder="เช่น Happy Hour 17:00-19:00"
+            placeholder={t("promo.title.placeholder")}
           />
         </FormField>
 
-        <FormField label="รายละเอียด" hint="ไม่บังคับ">
+        <FormField label={t("promo.desc_field")} hint={t("common.optional")}>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             maxLength={200}
             rows={3}
             className={`${input} resize-none`}
-            placeholder="เช่น เครื่องดื่มทุกแก้ว ลด 20%"
+            placeholder={t("promo.desc.placeholder")}
           />
         </FormField>
 
         <div className="rounded-2xl border border-line bg-canvas/40 p-4 space-y-3">
-          <div className="text-sm font-medium text-ink">กำหนดเวลาแสดง (ไม่บังคับ)</div>
-          <p className="text-xs text-muted">
-            เว้นว่าง = แสดงตลอดเวลาที่เปิดอยู่
-          </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <FormField label="เริ่มแสดง">
+            <FormField label={t("promo.start")}>
               <input
                 type="datetime-local"
                 value={startAt}
@@ -177,7 +176,7 @@ export default function PromotionManager({
                 className={`${input} tabular-nums`}
               />
             </FormField>
-            <FormField label="หมดเขต">
+            <FormField label={t("promo.end")}>
               <input
                 type="datetime-local"
                 value={endAt}
@@ -188,10 +187,7 @@ export default function PromotionManager({
           </div>
         </div>
 
-        <FormField
-          label="รูปภาพ"
-          hint="ไม่บังคับ — แนะนำขนาดสี่เหลี่ยมจัตุรัส"
-        >
+        <FormField label={t("promo.image")} hint={t("common.optional")}>
           <div className="flex items-center gap-3">
             {filePreview ? (
               <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-line bg-canvas">
@@ -221,21 +217,21 @@ export default function PromotionManager({
         ) : null}
 
         <button type="submit" disabled={busy} className={`${buttonPrimary} w-full`}>
-          {busy ? "กำลังบันทึก..." : "+ เพิ่มโปรโมชัน"}
+          {busy ? t("promo.submitting") : t("promo.submit")}
         </button>
       </form>
 
       <div className="space-y-3">
         {promotions.length === 0 ? (
           <EmptyState
-            title="ยังไม่มีโปรโมชัน"
-            description="สร้างโปรโมชันให้ลูกค้าเห็นแบนเนอร์เด่นตอนสแกน QR"
+            title={t("promo.empty")}
+            description={t("promo.empty.desc")}
           />
         ) : (
           <>
             <SectionHeading
-              title="รายการโปรโมชัน"
-              description={`${activeCount} เปิดอยู่ · ${promotions.length} ทั้งหมด`}
+              title={t("promo.list_title")}
+              description={`${activeCount} · ${promotions.length}`}
             />
             <ul className="space-y-2">
               {promotions.map((promotion) => (
@@ -268,11 +264,11 @@ export default function PromotionManager({
                       </span>
                       {promotion.active ? (
                         <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-700">
-                          แสดงอยู่
+                          {t("promo.active")}
                         </span>
                       ) : (
                         <span className="rounded-full bg-canvas px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted">
-                          ปิด
+                          {t("promo.inactive")}
                         </span>
                       )}
                     </div>
@@ -286,7 +282,7 @@ export default function PromotionManager({
                   <div className="flex shrink-0 flex-col items-end gap-2">
                     <label
                       className="flex cursor-pointer items-center gap-2 select-none"
-                      title="เปิด/ปิดการแสดงผล"
+                      title={`${t("promo.active")} / ${t("promo.inactive")}`}
                     >
                       <input
                         type="checkbox"
@@ -300,7 +296,7 @@ export default function PromotionManager({
                       onClick={() => deletePromotion(promotion)}
                       className="rounded-lg px-2 py-1 text-xs font-medium text-muted transition hover:bg-red-50 hover:text-red-600"
                     >
-                      ลบ
+                      {t("common.delete")}
                     </button>
                   </div>
                 </li>

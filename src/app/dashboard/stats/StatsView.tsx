@@ -1,14 +1,25 @@
 "use client";
 
-import { useMemo } from "react";
-import { formatKIP } from "@/lib/format";
+import { useMemo, useState } from "react";
+import { formatKIP, formatDateTime } from "@/lib/format";
 import { EmptyState, SectionHeading, card, cardPad } from "@/components/ui";
-import type { Menu, Order } from "@/lib/types";
+import { useT } from "@/lib/i18n/I18nProvider";
+import { pickName } from "@/lib/i18n/localized";
+import type { Category, Menu, Order } from "@/lib/types";
 
 interface Props {
   orders: Order[];
   menus: Menu[];
+  categories: Category[];
 }
+
+type RangeKey = "today" | "7d" | "30d";
+
+const RANGE_KEY: Record<RangeKey, string> = {
+  today: "stats.range.today",
+  "7d": "stats.range.7d",
+  "30d": "stats.range.30d",
+};
 
 function startOfDay(d: Date): Date {
   const x = new Date(d);
@@ -16,12 +27,26 @@ function startOfDay(d: Date): Date {
   return x;
 }
 
-export default function StatsView({ orders, menus }: Props) {
+function rangeStart(key: RangeKey): number {
+  if (key === "today") return startOfDay(new Date()).getTime();
+  if (key === "7d") return startOfDay(new Date(Date.now() - 6 * 86_400_000)).getTime();
+  return startOfDay(new Date(Date.now() - 29 * 86_400_000)).getTime();
+}
+
+export default function StatsView({ orders, menus, categories }: Props) {
+  const { t, locale } = useT();
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
+  const categoryMap = useMemo(
+    () => new Map(categories.map((c) => [c.id, c])),
+    [categories],
+  );
+
+  const [activeRange, setActiveRange] = useState<RangeKey | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   const stats = useMemo(() => {
-    const todayStart = startOfDay(new Date()).getTime();
-    const weekStart = startOfDay(new Date(Date.now() - 6 * 86_400_000)).getTime();
+    const todayStart = rangeStart("today");
+    const weekStart = rangeStart("7d");
 
     let todayRevenue = 0;
     let todayOrders = 0;
@@ -96,11 +121,16 @@ export default function StatsView({ orders, menus }: Props) {
   const maxRevenue = Math.max(1, ...stats.last7Days.map((d) => d.revenue));
   const hasData = orders.length > 0;
 
+  function toggleRange(r: RangeKey): void {
+    setActiveRange((cur) => (cur === r ? null : r));
+    setCategoryFilter(null);
+  }
+
   if (!hasData) {
     return (
       <EmptyState
-        title="ยังไม่มีข้อมูลยอดขาย"
-        description="เมื่อมีการรับชำระบิล สถิติจะปรากฏที่นี่ภายในไม่กี่วินาที"
+        title={t("stats.empty.title")}
+        description={t("stats.empty.desc")}
       />
     );
   }
@@ -108,27 +138,50 @@ export default function StatsView({ orders, menus }: Props) {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Stat
-          label="ยอดวันนี้"
+        <StatButton
+          label={t("stats.today")}
           revenue={stats.todayRevenue}
           orders={stats.todayOrders}
+          active={activeRange === "today"}
+          onClick={() => toggleRange("today")}
         />
-        <Stat
-          label="ยอด 7 วัน"
+        <StatButton
+          label={t("stats.week")}
           revenue={stats.weekRevenue}
           orders={stats.weekOrders}
+          active={activeRange === "7d"}
+          onClick={() => toggleRange("7d")}
         />
-        <Stat
-          label="ยอด 30 วัน"
+        <StatButton
+          label={t("stats.month")}
           revenue={stats.monthRevenue}
           orders={stats.monthOrders}
+          active={activeRange === "30d"}
+          onClick={() => toggleRange("30d")}
         />
       </div>
 
+      {activeRange ? (
+        <OrderDetailPanel
+          range={activeRange}
+          orders={orders}
+          menus={menus}
+          menuMap={menuMap}
+          categories={categories}
+          categoryMap={categoryMap}
+          categoryFilter={categoryFilter}
+          onChangeCategory={setCategoryFilter}
+          onClose={() => {
+            setActiveRange(null);
+            setCategoryFilter(null);
+          }}
+        />
+      ) : null}
+
       <div className={`${card} ${cardPad}`}>
         <SectionHeading
-          title="ยอดขายรายวัน"
-          description="7 วันล่าสุด"
+          title={t("stats.daily.title")}
+          description={t("stats.daily.desc")}
         />
         <div className="flex h-52 items-end justify-between gap-2 pt-4">
           {stats.last7Days.map((d) => {
@@ -167,9 +220,9 @@ export default function StatsView({ orders, menus }: Props) {
       </div>
 
       <div className={`${card} ${cardPad}`}>
-        <SectionHeading title="เมนูขายดี" description="Top 10 ใน 30 วัน" />
+        <SectionHeading title={t("stats.top.title")} description={t("stats.top.desc")} />
         {stats.topMenus.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted">ยังไม่มีข้อมูล</p>
+          <p className="py-6 text-center text-sm text-muted">{t("stats.top.empty")}</p>
         ) : (
           <ol className="space-y-2">
             {stats.topMenus.map((row, idx) => {
@@ -186,10 +239,10 @@ export default function StatsView({ orders, menus }: Props) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="truncate text-sm font-medium text-ink">
-                        {row.menu.name}
+                        {pickName(row.menu, locale)}
                       </span>
                       <span className="shrink-0 text-xs tabular-nums text-muted">
-                        {row.qty} จาน · {formatKIP(row.revenue)}
+                        {t("stats.top.qty_revenue", { qty: row.qty, revenue: formatKIP(row.revenue) })}
                       </span>
                     </div>
                     <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-line">
@@ -209,22 +262,231 @@ export default function StatsView({ orders, menus }: Props) {
   );
 }
 
-interface StatProps {
+interface StatButtonProps {
   label: string;
   revenue: number;
   orders: number;
+  active: boolean;
+  onClick: () => void;
 }
 
-function Stat({ label, revenue, orders }: StatProps) {
+function StatButton({ label, revenue, orders, active, onClick }: StatButtonProps) {
+  const { t } = useT();
   return (
-    <div className={`${card} ${cardPad}`}>
-      <div className="text-xs font-medium uppercase tracking-wider text-muted">
-        {label}
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${card} ${cardPad} text-left transition hover:border-ink/30 ${
+        active ? "border-ink/40 ring-2 ring-ink/10" : ""
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-medium uppercase tracking-wider text-muted">
+          {label}
+        </div>
+        <span className={`text-xs ${active ? "text-ink" : "text-muted"}`}>
+          {active ? t("stats.hide") : t("stats.view_detail")}
+        </span>
       </div>
       <div className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-ink">
         {formatKIP(revenue)}
       </div>
-      <div className="mt-1 text-xs text-muted">{orders} ออเดอร์</div>
+      <div className="mt-1 text-xs text-muted">{t("stats.orders_n", { n: orders })}</div>
+    </button>
+  );
+}
+
+interface OrderDetailPanelProps {
+  range: RangeKey;
+  orders: Order[];
+  menus: Menu[];
+  menuMap: Map<string, Menu>;
+  categories: Category[];
+  categoryMap: Map<string, Category>;
+  categoryFilter: string | null;
+  onChangeCategory: (id: string | null) => void;
+  onClose: () => void;
+}
+
+function OrderDetailPanel({
+  range,
+  orders,
+  menuMap,
+  categories,
+  categoryMap,
+  categoryFilter,
+  onChangeCategory,
+  onClose,
+}: OrderDetailPanelProps) {
+  const { t, locale } = useT();
+  // Build menu→category lookup once.
+  const menuCategoryOf = (menuId: string): string | null =>
+    menuMap.get(menuId)?.category_id ?? null;
+
+  const filtered = useMemo(() => {
+    const start = rangeStart(range);
+    const result: {
+      order: Order;
+      filteredItems: { menu: Menu; qty: number; lineTotal: number; note?: string }[];
+      filteredTotal: number;
+    }[] = [];
+
+    for (const order of orders) {
+      const t = new Date(order.created_at).getTime();
+      if (t < start) continue;
+
+      const items: { menu: Menu; qty: number; lineTotal: number; note?: string }[] = [];
+      let lineSum = 0;
+      for (const it of order.items) {
+        const menu = menuMap.get(it.menu_id);
+        if (!menu) continue;
+        if (categoryFilter && menu.category_id !== categoryFilter) continue;
+        const lineTotal = Number(menu.price) * it.qty;
+        items.push({ menu, qty: it.qty, lineTotal, note: it.note });
+        lineSum += lineTotal;
+      }
+      if (items.length === 0) continue;
+      result.push({
+        order,
+        filteredItems: items,
+        // When no category filter, use stored total (includes any historical pricing).
+        // When filtering, use re-computed line sum so totals make sense.
+        filteredTotal: categoryFilter ? lineSum : Number(order.total),
+      });
+    }
+    return result;
+  }, [orders, range, menuMap, categoryFilter]);
+
+  // Categories that actually appear in this range — hide noise.
+  const availableCategories = useMemo(() => {
+    const ids = new Set<string>();
+    const start = rangeStart(range);
+    for (const o of orders) {
+      if (new Date(o.created_at).getTime() < start) continue;
+      for (const it of o.items) {
+        const cid = menuCategoryOf(it.menu_id);
+        if (cid) ids.add(cid);
+      }
+    }
+    return categories.filter((c) => ids.has(c.id));
+    // menuCategoryOf depends on menuMap; orders/range/categories cover the rest.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, range, categories, menuMap]);
+
+  const totalRevenue = filtered.reduce((s, r) => s + r.filteredTotal, 0);
+  const totalItems = filtered.reduce(
+    (s, r) => s + r.filteredItems.reduce((q, i) => q + i.qty, 0),
+    0,
+  );
+
+  return (
+    <div className={`${card} ${cardPad} space-y-4`}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold tracking-tight text-ink">
+            {t("stats.detail.title", { range: t(RANGE_KEY[range]) })}
+          </h2>
+          <p className="mt-0.5 text-xs text-muted">
+            {t("stats.detail.summary", {
+              orders: filtered.length,
+              items: totalItems,
+              revenue: formatKIP(totalRevenue),
+            })}
+            {categoryFilter ? t("stats.detail.filtered") : ""}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-lg px-2.5 py-1.5 text-xs text-muted transition hover:bg-canvas hover:text-ink"
+        >
+          {t("stats.detail.close")}
+        </button>
+      </div>
+
+      {availableCategories.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          <CategoryChip
+            label={t("common.all")}
+            active={!categoryFilter}
+            onClick={() => onChangeCategory(null)}
+          />
+          {availableCategories.map((c) => (
+            <CategoryChip
+              key={c.id}
+              label={pickName(c, locale)}
+              active={categoryFilter === c.id}
+              onClick={() => onChangeCategory(c.id)}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {filtered.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted">
+          {categoryFilter
+            ? t("stats.detail.empty_filtered", {
+                name: categoryMap.get(categoryFilter)
+                  ? pickName(categoryMap.get(categoryFilter)!, locale)
+                  : "",
+              })
+            : t("stats.detail.empty")}
+        </p>
+      ) : (
+        <ul className="divide-y divide-line">
+          {filtered.map(({ order, filteredItems, filteredTotal }) => (
+            <li key={order.id} className="py-3 first:pt-0 last:pb-0">
+              <div className="flex items-baseline justify-between text-xs text-muted">
+                <span>{formatDateTime(order.created_at)}</span>
+                <span className="font-semibold tabular-nums text-ink">
+                  {formatKIP(filteredTotal)}
+                </span>
+              </div>
+              <ul className="mt-1.5 space-y-1">
+                {filteredItems.map((it, i) => (
+                  <li
+                    key={`${order.id}-${i}`}
+                    className="flex items-baseline justify-between gap-2 text-sm"
+                  >
+                    <span className="min-w-0 flex-1 text-ink">
+                      {pickName(it.menu, locale)}{" "}
+                      <span className="text-muted">×{it.qty}</span>
+                      {it.note ? (
+                        <span className="ml-1 text-xs text-muted">— {it.note}</span>
+                      ) : null}
+                    </span>
+                    <span className="shrink-0 tabular-nums text-muted">
+                      {formatKIP(it.lineTotal)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
+  );
+}
+
+interface CategoryChipProps {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}
+
+function CategoryChip({ label, active, onClick }: CategoryChipProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+        active
+          ? "bg-ink text-surface"
+          : "border border-line bg-surface text-ink hover:border-ink/30 hover:bg-canvas"
+      }`}
+    >
+      {label}
+    </button>
   );
 }

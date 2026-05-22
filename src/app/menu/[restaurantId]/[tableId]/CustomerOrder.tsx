@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatKIP } from "@/lib/format";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { useT } from "@/lib/i18n/I18nProvider";
+import { pickName } from "@/lib/i18n/localized";
 import { placeOrder } from "./actions";
 import { useCart } from "./hooks/useCart";
 import { useTableOrders } from "./hooks/useTableOrders";
@@ -50,6 +52,7 @@ export default function CustomerOrder({
   vatPct = 0,
 }: Props) {
   const confirm = useConfirm();
+  const { t, locale } = useT();
   const supabase = useMemo(() => createClient(), []);
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
   const validMenuIds = useMemo(() => new Set(menus.map((m) => m.id)), [menus]);
@@ -82,7 +85,7 @@ export default function CustomerOrder({
     const indexById = new Map<string | null, number>();
     for (const c of categories) {
       indexById.set(c.id, groups.length);
-      groups.push({ id: c.id, name: c.name, items: [] });
+      groups.push({ id: c.id, name: pickName(c, locale), items: [] });
     }
     const uncategorised: Menu[] = [];
     for (const m of menus) {
@@ -93,10 +96,10 @@ export default function CustomerOrder({
       }
     }
     if (uncategorised.length > 0) {
-      groups.push({ id: null, name: "อื่นๆ", items: uncategorised });
+      groups.push({ id: null, name: t("cust.uncategorized"), items: uncategorised });
     }
     return groups.filter((g) => g.items.length > 0);
-  }, [menus, categories]);
+  }, [menus, categories, locale, t]);
 
   const visibleGroups = useMemo(() => {
     if (activeFilter === "all") return grouped;
@@ -118,7 +121,7 @@ export default function CustomerOrder({
   async function submitOrder(): Promise<void> {
     if (totalQty === 0) return;
     if (!shopOpen) {
-      setError("ร้านปิดอยู่ตอนนี้ ไม่สามารถสั่งได้");
+      setError(t("cust.shop_closed_cant_order"));
       return;
     }
     setSubmitting(true);
@@ -135,7 +138,7 @@ export default function CustomerOrder({
     const result = await placeOrder({ restaurantId, tableId, items });
 
     if (!result.ok) {
-      setError(`สั่งไม่สำเร็จ: ${result.error}`);
+      setError(t("cust.submit_failed", { error: result.error ?? "" }));
       setSubmitting(false);
       return;
     }
@@ -149,7 +152,7 @@ export default function CustomerOrder({
   if (menus.length === 0) {
     return (
       <div className="px-5 py-16 text-center text-muted">
-        ยังไม่มีเมนูพร้อมขาย กรุณาสอบถามพนักงาน
+        {t("cust.no_menus")}
       </div>
     );
   }
@@ -162,7 +165,7 @@ export default function CustomerOrder({
         <div className="sticky top-0 z-10 border-b border-line bg-surface/90 backdrop-blur-md">
           <div className="no-scrollbar flex gap-2 overflow-x-auto px-5 py-3">
             <FilterChip
-              label="ทั้งหมด"
+              label={t("cust.filter.all")}
               active={activeFilter === "all"}
               onClick={() => setActiveFilter("all")}
             />
@@ -188,10 +191,12 @@ export default function CustomerOrder({
               <h2 className="text-base font-semibold tracking-tight text-ink">
                 {group.name}
               </h2>
-              <span className="text-xs text-muted">{group.items.length} รายการ</span>
+              <span className="text-xs text-muted">
+                {t("cust.items_count", { count: group.items.length })}
+              </span>
             </div>
 
-            <ul className="space-y-2.5">
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {group.items.map((menu) => {
                 const line = cart[menu.id];
                 const qty = line?.qty ?? 0;
@@ -205,7 +210,6 @@ export default function CustomerOrder({
                     note={note}
                     editingNote={isEditingNote}
                     onAdd={() => add(menu.id)}
-                    onAddBundle={(amount) => add(menu.id, amount)}
                     onRemove={() => remove(menu.id)}
                     onToggleNote={() => setNoteEditing(isEditingNote ? null : menu.id)}
                     onNoteChange={(v) => setNote(menu.id, v)}
@@ -223,15 +227,15 @@ export default function CustomerOrder({
           icon={readyCount > 0 ? "🍽" : "🧾"}
           label={
             activeOrders.length > 0
-              ? `ออเดอร์ของคุณ (${activeOrders.length})`
-              : "ดูบิล"
+              ? t("cust.your_orders_n", { count: activeOrders.length })
+              : t("cust.view_bill")
           }
           onClick={() => setShowBill(true)}
-          badge={readyCount > 0 ? "พร้อมเสิร์ฟ" : null}
+          badge={readyCount > 0 ? t("cust.ready_badge") : null}
         />
         <FloatingButton
           icon="🛎"
-          label="เรียกพนักงาน"
+          label={t("cust.call_staff")}
           onClick={() => setCallOpen(true)}
           accent
         />
@@ -240,7 +244,7 @@ export default function CustomerOrder({
       {success && (
         <div className="fixed inset-x-0 top-4 z-30 mx-auto flex w-fit animate-slide-up items-center gap-2 rounded-full bg-ink px-4 py-2.5 text-sm font-medium text-surface shadow-pop">
           <span className="text-emerald-400">✓</span>
-          ส่งออเดอร์เรียบร้อย กำลังเตรียมให้
+          {t("cust.order_sent_long")}
         </div>
       )}
 
@@ -255,16 +259,16 @@ export default function CustomerOrder({
             <button
               onClick={async () => {
                 const ok = await confirm({
-                  title: "ล้างรายการทั้งหมดในตะกร้า?",
-                  description: "รายการที่เลือกไว้จะหายหมด สามารถเลือกใหม่ได้",
-                  confirmText: "ล้างทั้งหมด",
+                  title: t("cust.clear_cart.title"),
+                  description: t("cust.clear_cart.desc"),
+                  confirmText: t("cust.clear_cart.confirm"),
                   tone: "danger",
                 });
                 if (ok) clear();
               }}
               disabled={submitting}
               className="flex h-[3.25rem] shrink-0 items-center gap-1.5 rounded-2xl border border-line bg-surface px-3.5 text-sm font-medium text-muted transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-              aria-label="ล้างตะกร้า"
+              aria-label={t("cust.clear_cart.button")}
             >
               <svg
                 viewBox="0 0 24 24"
@@ -275,7 +279,7 @@ export default function CustomerOrder({
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="m5 7 1 13a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-13M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3M3 7h18" />
               </svg>
-              <span className="hidden sm:inline">ล้าง</span>
+              <span className="hidden sm:inline">{t("cust.clear_cart.button")}</span>
             </button>
             <button
               onClick={submitOrder}
@@ -288,10 +292,10 @@ export default function CustomerOrder({
                 </span>
                 <span className="text-sm font-medium">
                   {!shopOpen
-                    ? "ร้านปิดอยู่"
+                    ? t("cust.shop_closed_short")
                     : submitting
-                      ? "กำลังส่ง..."
-                      : "สั่งเลย"}
+                      ? t("cust.sending")
+                      : t("cust.submit_order")}
                 </span>
               </span>
               <span className="text-base font-semibold tabular-nums">

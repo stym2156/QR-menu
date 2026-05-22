@@ -13,6 +13,8 @@ import {
 } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/toast";
+import { useT } from "@/lib/i18n/I18nProvider";
+import { pickName } from "@/lib/i18n/localized";
 import type { Category } from "@/lib/types";
 
 interface Props {
@@ -24,46 +26,69 @@ export default function CategoryManager({ restaurantId, initialCategories }: Pro
   const supabase = createClient();
   const confirm = useConfirm();
   const toast = useToast();
+  const { t, locale } = useT();
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [name, setName] = useState("");
+  const [nameLo, setNameLo] = useState("");
+  const [nameEn, setNameEn] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleAdd(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     setError(null);
+
+    const th = name.trim();
+    const lo = nameLo.trim();
+    const en = nameEn.trim();
+    if (!th && !lo && !en) {
+      setError(t("mgr.cat.error.no_name"));
+      return;
+    }
+
     setBusy(true);
 
     const sort_order = categories.length;
+    // `name` is NOT NULL in the schema — fall back to whichever language is filled
+    // so owners can add a category in only Lao or only English if they want.
+    const primary = th || lo || en;
     const { data, error: insertError } = await supabase
       .from("categories")
-      .insert({ restaurant_id: restaurantId, name, sort_order })
+      .insert({
+        restaurant_id: restaurantId,
+        name: primary,
+        name_lo: lo || null,
+        name_en: en || null,
+        sort_order,
+      })
       .select()
       .single();
 
     if (insertError || !data) {
-      setError(`เพิ่มหมวดไม่สำเร็จ: ${insertError?.message}`);
+      setError(t("mgr.cat.add_failed", { error: insertError?.message ?? "" }));
       setBusy(false);
       return;
     }
 
     setCategories((prev) => [...prev, data as Category]);
     setName("");
+    setNameLo("");
+    setNameEn("");
     setBusy(false);
   }
 
   async function deleteCategory(category: Category): Promise<void> {
     const ok = await confirm({
-      title: `ลบหมวด "${category.name}"?`,
-      description: "เมนูในหมวดจะกลายเป็นไม่มีหมวด การกระทำนี้ย้อนกลับไม่ได้",
-      confirmText: "ลบ",
+      title: t("mgr.cat.delete.title", { name: category.name }),
+      description: t("mgr.cat.delete.desc"),
+      confirmText: t("common.delete"),
       tone: "danger",
     });
     if (!ok) return;
     setCategories((prev) => prev.filter((c) => c.id !== category.id));
     const { error } = await supabase.from("categories").delete().eq("id", category.id);
-    if (error) toast.error(`ลบไม่สำเร็จ: ${error.message}`);
-    else toast.success("ลบหมวดแล้ว");
+    if (error) toast.error(t("mgr.cat.delete_failed", { error: error.message }));
+    else toast.success(t("mgr.cat.deleted"));
   }
 
   async function renameCategory(category: Category, newName: string): Promise<void> {
@@ -91,16 +116,35 @@ export default function CategoryManager({ restaurantId, initialCategories }: Pro
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-[320px_1fr]">
       <form onSubmit={handleAdd} className={`${card} ${cardPad} h-fit space-y-4 lg:sticky lg:top-20`}>
-        <SectionHeading title="เพิ่มหมวด" />
+        <SectionHeading title={t("mgr.cat.add_title")} />
 
-        <FormField label="ชื่อหมวด">
+        <FormField label={t("mgr.cat.name_th")} hint={t("mgr.cat.name_th.hint")}>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            required
             className={input}
-            placeholder="เช่น อาหาร, เครื่องดื่ม"
+            placeholder={t("mgr.cat.name_th.placeholder")}
+          />
+        </FormField>
+
+        <FormField label={t("mgr.cat.name_lo")} hint={t("mgr.cat.name_lo.hint")}>
+          <input
+            type="text"
+            value={nameLo}
+            onChange={(e) => setNameLo(e.target.value)}
+            className={input}
+            placeholder={t("mgr.cat.name_lo.placeholder")}
+          />
+        </FormField>
+
+        <FormField label={t("mgr.cat.name_en")} hint={t("mgr.cat.name_en.hint")}>
+          <input
+            type="text"
+            value={nameEn}
+            onChange={(e) => setNameEn(e.target.value)}
+            className={input}
+            placeholder={t("mgr.cat.name_en.placeholder")}
           />
         </FormField>
 
@@ -109,27 +153,28 @@ export default function CategoryManager({ restaurantId, initialCategories }: Pro
         ) : null}
 
         <button type="submit" disabled={busy} className={`${buttonPrimary} w-full`}>
-          {busy ? "กำลังเพิ่ม..." : "+ เพิ่มหมวด"}
+          {busy ? t("mgr.cat.submitting") : t("mgr.cat.submit")}
         </button>
       </form>
 
       <div className="space-y-3">
         {categories.length === 0 ? (
           <EmptyState
-            title="ยังไม่มีหมวด"
-            description="เริ่มสร้างหมวดแรกของคุณด้วยฟอร์มทางซ้าย"
+            title={t("mgr.cat.empty")}
+            description={t("mgr.cat.empty.desc")}
           />
         ) : (
           <>
             <SectionHeading
-              title="รายการหมวด"
-              description={`ทั้งหมด ${categories.length} หมวด · คลิกที่ชื่อเพื่อแก้ไข`}
+              title={t("mgr.cat.list_title")}
+              description={t("mgr.cat.list_desc", { n: categories.length })}
             />
             <ul className="space-y-2">
               {categories.map((category, idx) => (
                 <CategoryRow
                   key={category.id}
                   category={category}
+                  displayName={pickName(category, locale)}
                   isFirst={idx === 0}
                   isLast={idx === categories.length - 1}
                   onRename={(name) => renameCategory(category, name)}
@@ -148,6 +193,7 @@ export default function CategoryManager({ restaurantId, initialCategories }: Pro
 
 interface CategoryRowProps {
   category: Category;
+  displayName: string;
   isFirst: boolean;
   isLast: boolean;
   onRename: (name: string) => void;
@@ -158,6 +204,7 @@ interface CategoryRowProps {
 
 function CategoryRow({
   category,
+  displayName,
   isFirst,
   isLast,
   onRename,
@@ -165,6 +212,7 @@ function CategoryRow({
   onMoveUp,
   onMoveDown,
 }: CategoryRowProps) {
+  const { t } = useT();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(category.name);
 
@@ -175,7 +223,7 @@ function CategoryRow({
           onClick={onMoveUp}
           disabled={isFirst}
           className="flex h-5 w-5 items-center justify-center rounded text-muted transition hover:bg-canvas hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
-          aria-label="เลื่อนขึ้น"
+          aria-label={t("mgr.cat.move_up")}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
             <path strokeLinecap="round" strokeLinejoin="round" d="m6 14 6-6 6 6" />
@@ -185,7 +233,7 @@ function CategoryRow({
           onClick={onMoveDown}
           disabled={isLast}
           className="flex h-5 w-5 items-center justify-center rounded text-muted transition hover:bg-canvas hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
-          aria-label="เลื่อนลง"
+          aria-label={t("mgr.cat.move_down")}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
             <path strokeLinecap="round" strokeLinejoin="round" d="m6 10 6 6 6-6" />
@@ -220,7 +268,7 @@ function CategoryRow({
             onClick={() => setEditing(true)}
             className="block w-full text-left text-sm font-medium text-ink transition hover:text-accent-600"
           >
-            {category.name}
+            {displayName}
           </button>
         )}
       </div>
@@ -228,7 +276,7 @@ function CategoryRow({
         onClick={onDelete}
         className="rounded-lg px-2 py-1 text-xs font-medium text-muted transition hover:bg-red-50 hover:text-red-600"
       >
-        ลบ
+        {t("common.delete")}
       </button>
     </li>
   );

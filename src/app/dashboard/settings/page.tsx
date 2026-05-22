@@ -1,15 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
+import NoShopMessage from "@/components/NoShopMessage";
 import { redirect } from "next/navigation";
 import { getCurrentMembership } from "@/lib/membership";
 import SettingsForm from "./SettingsForm";
 import StaffManager from "./StaffManager";
-import { PageHeader, SectionHeading } from "@/components/ui";
+import I18nPageHeader from "@/components/I18nPageHeader";
+import SettingsTeamHeadingClient from "./SettingsTeamHeadingClient";
 import type { Restaurant } from "@/lib/types";
 
 interface StaffMember {
   id: string;
   user_id: string;
-  role: "owner" | "staff";
+  role: "owner" | "staff" | "cook" | "waiter";
   invited_email: string | null;
   created_at: string;
 }
@@ -47,9 +49,9 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <PageHeader
-          title="ตั้งค่าร้าน"
-          description="ชื่อร้าน · เวลาทำการ · รหัสผ่าน"
+        <I18nPageHeader
+          titleKey="page.settings.title"
+          descKey="page.settings.desc"
         />
         <SettingsForm
           restaurant={restaurant as Restaurant}
@@ -58,10 +60,7 @@ export default async function SettingsPage() {
       </div>
 
       <div>
-        <SectionHeading
-          title="พนักงาน"
-          description="เพิ่มทีมงานให้เข้าใช้หน้า ครัว + เช็คบิล (ไม่เห็นยอดขาย/ตั้งค่า)"
-        />
+        <SettingsTeamHeadingClient />
         <StaffManager
           restaurantId={membership.restaurantId}
           currentUserId={user.id}

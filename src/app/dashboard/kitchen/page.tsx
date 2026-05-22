@@ -1,7 +1,9 @@
+import { redirect } from "next/navigation";
+import NoShopMessage from "@/components/NoShopMessage";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentMembership } from "@/lib/membership";
+import { canSeeKitchen, getCurrentMembership } from "@/lib/membership";
 import KitchenDisplay from "./KitchenDisplay";
-import { PageHeader } from "@/components/ui";
+import I18nPageHeader from "@/components/I18nPageHeader";
 import type { CallStaffRequest, DiningTable, Menu, Order } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +20,7 @@ export default async function KitchenPage() {
   if (!membership) {
     return <p className="text-muted">ยังไม่มีร้าน — กรุณา signup ใหม่</p>;
   }
+  if (!canSeeKitchen(membership.role)) redirect("/dashboard");
   const restaurant = { id: membership.restaurantId };
 
   const [{ data: orders }, { data: menus }, { data: tables }, { data: calls }] =
@@ -40,10 +43,7 @@ export default async function KitchenPage() {
 
   return (
     <div>
-      <PageHeader
-        title="ครัว"
-        description="ออเดอร์เข้า realtime · เปิดเสียงไว้ตลอดเวลาทำงาน"
-      />
+      <I18nPageHeader titleKey="page.kitchen.title" descKey="page.kitchen.desc" />
       <KitchenDisplay
         restaurantId={restaurant.id}
         initialOrders={(orders ?? []) as Order[]}

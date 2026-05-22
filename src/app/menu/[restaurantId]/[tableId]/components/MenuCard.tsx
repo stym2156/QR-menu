@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import { formatKIP } from "@/lib/format";
+import { useT } from "@/lib/i18n/I18nProvider";
+import { pickName } from "@/lib/i18n/localized";
 import type { Menu } from "@/lib/types";
 
 interface MenuCardProps {
@@ -10,7 +12,6 @@ interface MenuCardProps {
   note: string;
   editingNote: boolean;
   onAdd: () => void;
-  onAddBundle: (amount: number) => void;
   onRemove: () => void;
   onToggleNote: () => void;
   onNoteChange: (value: string) => void;
@@ -23,113 +24,80 @@ export function MenuCard({
   note,
   editingNote,
   onAdd,
-  onAddBundle,
   onRemove,
   onToggleNote,
   onNoteChange,
   onCloseNote,
 }: MenuCardProps) {
+  const { t, locale } = useT();
   const selected = qty > 0;
+  const displayName = pickName(menu, locale);
   return (
     <li
       className={`group relative overflow-hidden rounded-2xl border bg-surface transition ${
         selected ? "border-ink/30 shadow-card" : "border-line"
       }`}
     >
-      <div className="flex gap-3 p-3">
-        <div
-          className={`relative h-24 w-24 shrink-0 overflow-hidden rounded-xl ${
-            menu.image_url ? "" : "border border-line bg-canvas"
-          }`}
-        >
+      <button
+        type="button"
+        onClick={onAdd}
+        className="block w-full text-left active:scale-[0.98] transition-transform"
+        aria-label={`${t("cust.add_to_order")} ${displayName}`}
+      >
+        <div className="relative aspect-square w-full overflow-hidden bg-canvas">
           {menu.image_url ? (
             <Image
               src={menu.image_url}
-              alt={menu.name}
+              alt={displayName}
               fill
-              sizes="96px"
-              className="object-contain transition duration-500 group-hover:scale-105"
+              sizes="(max-width: 640px) 50vw, 240px"
+              className="object-cover transition duration-500 group-hover:scale-105"
             />
           ) : (
             <div className="flex h-full items-center justify-center text-xs text-muted">
               —
             </div>
           )}
-        </div>
-
-        <div className="flex flex-1 flex-col justify-between gap-1.5">
-          <div>
-            <div className="line-clamp-2 text-[15px] font-medium leading-snug text-ink">
-              {menu.name}
-            </div>
-            <div className="mt-0.5 text-sm font-medium tabular-nums text-muted">
-              {formatKIP(menu.price)}
-            </div>
-          </div>
-
-          <div className="flex items-end justify-between">
-            <div className="flex-1">
-              {selected && (
-                <button
-                  onClick={onToggleNote}
-                  className={`text-[11px] font-medium ${
-                    note ? "text-accent-600" : "text-muted hover:text-ink"
-                  }`}
-                >
-                  {note ? `📝 ${note}` : "+ หมายเหตุ"}
-                </button>
-              )}
-            </div>
-
-            {selected ? (
-              <div className="flex items-center gap-1 rounded-full border border-line bg-canvas p-0.5">
-                <button
-                  onClick={onRemove}
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-ink transition hover:bg-line"
-                  aria-label="ลด"
-                >
-                  −
-                </button>
-                <span className="min-w-[1.5rem] text-center text-sm font-semibold tabular-nums">
-                  {qty}
-                </span>
-                <button
-                  onClick={onAdd}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-orange-500 text-white shadow-xl shadow-red-500/40 transition-all hover:scale-110 hover:shadow-red-500/50 active:scale-90 ring-2 ring-white ring-offset-2 ring-offset-surface"
-                  aria-label="เพิ่ม"
-                >
-                  +
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={onAdd}
-                className="rounded-full border border-ink/15 bg-canvas px-4 py-1.5 text-sm font-medium text-ink transition hover:border-ink hover:bg-ink hover:text-surface"
-              >
-                เพิ่ม
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {menu.bundles && menu.bundles.length > 0 ? (
-        <div className="border-t border-line bg-amber-50/40 px-3 py-2">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] font-medium uppercase tracking-wider text-amber-700">
-              แนะนำ
+          {selected ? (
+            <span className="absolute right-2 top-2 flex h-7 min-w-[1.75rem] items-center justify-center rounded-full bg-ink px-2 text-xs font-bold tabular-nums text-surface shadow-md">
+              {qty}
             </span>
-            {menu.bundles.map((b, idx) => (
-              <button
-                key={idx}
-                onClick={() => onAddBundle(b.qty)}
-                className="rounded-full border border-amber-200 bg-surface px-2.5 py-1 text-[11px] font-medium text-amber-800 transition hover:border-amber-400 hover:bg-amber-100 active:scale-95"
-              >
-                {b.label} ×{b.qty}
-              </button>
-            ))}
+          ) : null}
+        </div>
+
+        <div className="space-y-1 px-3 py-2.5">
+          <div className="line-clamp-2 min-h-[2.5em] text-[13px] font-medium leading-snug text-ink">
+            {displayName}
+          </div>
+          <div className="text-sm font-semibold tabular-nums text-ink">
+            {formatKIP(menu.price)}
           </div>
         </div>
+      </button>
+
+      {selected ? (
+        <div className="absolute left-2 top-2 flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onRemove}
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-surface/95 text-base font-semibold text-ink shadow-md ring-1 ring-line backdrop-blur transition hover:bg-surface active:scale-95"
+            aria-label={t("cust.dec")}
+          >
+            −
+          </button>
+        </div>
+      ) : null}
+
+      {selected ? (
+        <button
+          type="button"
+          onClick={onToggleNote}
+          className={`block w-full border-t border-line px-3 py-1.5 text-left text-[11px] font-medium transition ${
+            note ? "bg-canvas text-accent-600" : "text-muted hover:bg-canvas hover:text-ink"
+          }`}
+        >
+          {note ? `📝 ${note}` : `+ ${t("cust.note_add")}`}
+        </button>
       ) : null}
 
       {editingNote && (
@@ -140,7 +108,7 @@ export function MenuCard({
             onChange={(e) => onNoteChange(e.target.value)}
             onBlur={onCloseNote}
             onKeyDown={(e) => e.key === "Enter" && onCloseNote()}
-            placeholder="เช่น เผ็ดน้อย, ไม่ใส่ผัก, ไม่หวาน"
+            placeholder={t("cust.note_placeholder_examples")}
             autoFocus
             maxLength={120}
             className="w-full bg-transparent text-sm text-ink placeholder:text-muted/70 focus:outline-none"

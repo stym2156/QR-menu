@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/lib/i18n/I18nProvider";
 
 interface CancelOrderDialogProps {
   tableNumber: number | string;
@@ -8,20 +9,21 @@ interface CancelOrderDialogProps {
   onClose: () => void;
 }
 
-const PRESET_REASONS = [
-  "ของหมด",
-  "ลูกค้าขอเปลี่ยน",
-  "สั่งซ้ำ",
-  "เครื่องครัวเสีย",
-];
-
 export function CancelOrderDialog({
   tableNumber,
   onConfirm,
   onClose,
 }: CancelOrderDialogProps) {
+  const { t } = useT();
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const presets = [
+    t("cancel.preset.out_alt"),
+    t("cancel.preset.cust_change"),
+    t("cancel.preset.dup"),
+    t("cancel.preset.equipment"),
+  ];
 
   async function submit(presetReason?: string): Promise<void> {
     const finalReason = (presetReason ?? reason).trim();
@@ -42,20 +44,18 @@ export function CancelOrderDialog({
       >
         <div className="px-5 pt-5">
           <h3 className="text-base font-semibold tracking-tight text-ink">
-            ยกเลิกออเดอร์โต๊ะที่ {tableNumber}
+            {t("cancel.title_table", { n: tableNumber })}
           </h3>
-          <p className="mt-1.5 text-sm text-muted">
-            ระบุเหตุผลเพื่อให้ลูกค้าทราบ — จะแสดงในหน้าออเดอร์ของลูกค้า
-          </p>
+          <p className="mt-1.5 text-sm text-muted">{t("cancel.desc")}</p>
         </div>
 
         <div className="space-y-3 px-5 pt-4">
           <div>
             <div className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted">
-              เลือกเหตุผลที่ใช้บ่อย
+              {t("cancel.preset_header")}
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {PRESET_REASONS.map((preset) => (
+              {presets.map((preset) => (
                 <button
                   key={preset}
                   onClick={() => submit(preset)}
@@ -70,14 +70,16 @@ export function CancelOrderDialog({
 
           <div className="flex items-center gap-2 pt-1">
             <div className="h-px flex-1 bg-line" />
-            <span className="text-xs uppercase tracking-wider text-muted">หรือ</span>
+            <span className="text-xs uppercase tracking-wider text-muted">
+              {t("cancel.or")}
+            </span>
             <div className="h-px flex-1 bg-line" />
           </div>
 
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="พิมพ์เหตุผลเอง..."
+            placeholder={t("cancel.placeholder_self")}
             maxLength={200}
             rows={2}
             autoFocus
@@ -92,14 +94,14 @@ export function CancelOrderDialog({
             disabled={busy}
             className="flex-1 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-canvas disabled:opacity-50"
           >
-            เก็บไว้
+            {t("cancel.keep")}
           </button>
           <button
             onClick={() => submit()}
             disabled={busy || !reason.trim()}
             className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-medium text-surface transition hover:bg-red-700 active:scale-[0.98] disabled:opacity-50"
           >
-            {busy ? "กำลังยกเลิก..." : "ยกเลิกออเดอร์"}
+            {busy ? t("cancel.submitting") : t("cancel.submit")}
           </button>
         </div>
       </div>

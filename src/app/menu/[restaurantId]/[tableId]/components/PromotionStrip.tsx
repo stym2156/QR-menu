@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
+import { useT } from "@/lib/i18n/I18nProvider";
 import type { Promotion } from "@/lib/types";
 
 interface PromotionStripProps {
@@ -9,6 +10,7 @@ interface PromotionStripProps {
 }
 
 export function PromotionStrip({ promotions }: PromotionStripProps) {
+  const { t } = useT();
   const ref = useRef<HTMLDivElement>(null);
   const [activeIdx, setActiveIdx] = useState(0);
 
@@ -59,7 +61,7 @@ export function PromotionStrip({ promotions }: PromotionStripProps) {
                   ? "w-6 bg-ink"
                   : "w-1.5 bg-line hover:bg-muted"
               }`}
-              aria-label={`โปรที่ ${idx + 1}`}
+              aria-label={t("promo.strip.aria_n", { n: idx + 1 })}
             />
           ))}
         </div>
@@ -69,6 +71,7 @@ export function PromotionStrip({ promotions }: PromotionStripProps) {
 }
 
 function PromotionCard({ promotion }: { promotion: Promotion }) {
+  const { t } = useT();
   const hasImage = !!promotion.image_url;
   return (
     <div className="flex w-[85%] shrink-0 snap-start flex-col overflow-hidden rounded-2xl bg-ink text-surface shadow-card sm:w-[60%] lg:w-[40%]">
@@ -95,7 +98,7 @@ function PromotionCard({ promotion }: { promotion: Promotion }) {
       <div className="flex min-h-[5.5rem] flex-col justify-center px-4 py-3">
         <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.18em] text-amber-300">
           <span>✦</span>
-          <span>Promotion</span>
+          <span>{t("promo.strip.label")}</span>
         </div>
         <div className="mt-1 line-clamp-2 text-base font-semibold leading-snug tracking-tight">
           {promotion.title}

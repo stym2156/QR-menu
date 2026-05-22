@@ -5,8 +5,10 @@ import { createClient } from "@/lib/supabase/client";
 import { formatKIP, formatTime } from "@/lib/format";
 import { EmptyState, buttonSecondary } from "@/components/ui";
 import { useToast } from "@/components/toast";
+import { useT } from "@/lib/i18n/I18nProvider";
 import { printReceipt } from "./receipt";
 import { BillModal, type BillGroup } from "./BillModal";
+import SettledBills from "./SettledBills";
 import type {
   DiningTable,
   Menu,
@@ -14,12 +16,16 @@ import type {
   PaymentMethod,
 } from "@/lib/types";
 
+type Tab = "unpaid" | "settled";
+
 interface Props {
   restaurantId: string;
   restaurantName: string;
   serviceChargePct: number;
   vatPct: number;
+  paymentQrUrl: string | null;
   initialOrders: Order[];
+  initialSettledOrders: Order[];
   tables: DiningTable[];
   menus: Menu[];
 }
@@ -29,13 +35,18 @@ export default function BillsView({
   restaurantName,
   serviceChargePct,
   vatPct,
+  paymentQrUrl,
   initialOrders,
+  initialSettledOrders,
   tables,
   menus,
 }: Props) {
   const supabase = createClient();
   const toast = useToast();
+  const { t, locale } = useT();
   const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [settledOrders, setSettledOrders] = useState<Order[]>(initialSettledOrders);
+  const [tab, setTab] = useState<Tab>("unpaid");
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [lastSettled, setLastSettled] = useState<{
     orders: Order[];
@@ -110,6 +121,14 @@ export default function BillsView({
             if (exists) return prev.map((o) => (o.id === next.id ? next : o));
             return [...prev, next];
           });
+          // Keep settled list in sync — add when paid, update if already there.
+          if (next.paid) {
+            setSettledOrders((prev) => {
+              const exists = prev.some((o) => o.id === next.id);
+              if (exists) return prev.map((o) => (o.id === next.id ? next : o));
+              return [next, ...prev];
+            });
+          }
         },
       )
       .on(
@@ -146,7 +165,7 @@ export default function BillsView({
       .in("id", ids);
 
     if (error) {
-      toast.error(`รับชำระไม่สำเร็จ: ${error.message}`);
+      toast.error(t("bill.settle.failed", { error: error.message }));
       const { data } = await supabase
         .from("orders")
         .select("*")
@@ -163,7 +182,7 @@ export default function BillsView({
       .update({ is_open: false })
       .eq("id", tableId);
     if (closeError) {
-      toast.error(`ปิดโต๊ะอัตโนมัติไม่สำเร็จ: ${closeError.message}`);
+      toast.error(t("bill.close_failed", { error: closeError.message }));
     }
 
     setLastSettled({
@@ -172,7 +191,19 @@ export default function BillsView({
       method,
       paidAt: now,
     });
-    toast.success("รับชำระเรียบร้อย · ปิดโต๊ะแล้ว");
+    // Optimistically push into the settled-bills list so the "ปิดบิลแล้ว"
+    // tab reflects the new bill immediately, regardless of realtime latency.
+    setSettledOrders((prev) => {
+      const updated = tableOrders.map((o) => ({
+        ...o,
+        paid: true,
+        paid_at: now,
+        payment_method: method,
+      }));
+      const ids = new Set(updated.map((o) => o.id));
+      return [...updated, ...prev.filter((o) => !ids.has(o.id))];
+    });
+    toast.success(t("bill.settled.toast.success"));
   }
 
   function handlePrintLastReceipt(): void {
@@ -186,6 +217,8 @@ export default function BillsView({
       paidAt: lastSettled.paidAt,
       serviceChargePct,
       vatPct,
+      paymentQrUrl,
+      locale,
     });
   }
 
@@ -196,7 +229,9 @@ export default function BillsView({
       {lastSettled && lastSettled.table ? (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
           <div className="text-sm text-emerald-900">
-            <span className="font-semibold">รับชำระโต๊ะ {lastSettled.table.table_number} แล้ว</span>
+            <span className="font-semibold">
+              {t("bill.settled.banner", { n: lastSettled.table.table_number })}
+            </span>
             <span className="ml-2 text-emerald-700">
               {formatKIP(
                 lastSettled.orders.reduce(
@@ -211,65 +246,91 @@ export default function BillsView({
               onClick={handlePrintLastReceipt}
               className={`${buttonSecondary} py-2 text-xs`}
             >
-              🖨 พิมพ์ใบเสร็จ
+              {t("bill.settled.print")}
             </button>
             <button
               onClick={() => setLastSettled(null)}
               className="rounded-lg px-2 py-2 text-xs text-emerald-700 hover:bg-emerald-100"
             >
-              ปิด
+              {t("bill.settled.close")}
             </button>
           </div>
         </div>
       ) : null}
 
-      {byTable.length === 0 ? (
-        <EmptyState
-          title="ยังไม่มีโต๊ะที่ค้างบิล"
-          description="เมื่อมีลูกค้าสั่งอาหาร โต๊ะจะปรากฏที่นี่"
+      <div className="mb-4 flex gap-1.5 rounded-xl bg-canvas p-1">
+        <TabButton
+          label={t("page.bills.tab.unpaid")}
+          count={byTable.length}
+          active={tab === "unpaid"}
+          onClick={() => setTab("unpaid")}
         />
-      ) : (
-        <>
-          <div className="mb-4 flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-2.5">
-            <span className="text-xs font-medium uppercase tracking-wider text-muted">
-              ยอดค้างชำระทั้งหมด
-            </span>
-            <span className="text-xl font-semibold tabular-nums tracking-tight text-ink">
-              {formatKIP(grandTotal)}
-            </span>
-          </div>
+        <TabButton
+          label={t("page.bills.tab.settled")}
+          active={tab === "settled"}
+          onClick={() => setTab("settled")}
+        />
+      </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {byTable.map((group) => (
-              <button
-                key={group.tableId}
-                onClick={() => setSelectedTableId(group.tableId)}
-                className="group rounded-2xl border border-line bg-surface p-5 text-left transition hover:border-ink/30 hover:shadow-card"
-              >
-                <div className="flex items-baseline justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-ink text-sm font-semibold tabular-nums text-surface">
-                      {group.table?.table_number}
-                    </span>
-                    <div className="text-xs text-muted">
-                      <div>{group.orders.length} ออเดอร์</div>
-                      <div>{group.itemCount} รายการ</div>
+      {tab === "unpaid" ? (
+        byTable.length === 0 ? (
+          <EmptyState
+            title={t("bill.unpaid.empty.title")}
+            description={t("bill.unpaid.empty.desc")}
+          />
+        ) : (
+          <>
+            <div className="mb-4 flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-2.5">
+              <span className="text-xs font-medium uppercase tracking-wider text-muted">
+                {t("bill.unpaid.total")}
+              </span>
+              <span className="text-xl font-semibold tabular-nums tracking-tight text-ink">
+                {formatKIP(grandTotal)}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {byTable.map((group) => (
+                <button
+                  key={group.tableId}
+                  onClick={() => setSelectedTableId(group.tableId)}
+                  className="group rounded-2xl border border-line bg-surface p-5 text-left transition hover:border-ink/30 hover:shadow-card"
+                >
+                  <div className="flex items-baseline justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-ink text-sm font-semibold tabular-nums text-surface">
+                        {group.table?.table_number}
+                      </span>
+                      <div className="text-xs text-muted">
+                        <div>{t("bill.unpaid.orders_n", { n: group.orders.length })}</div>
+                        <div>{t("bill.unpaid.items_n", { n: group.itemCount })}</div>
+                      </div>
                     </div>
+                    <span className="text-[11px] text-muted">
+                      {t("bill.unpaid.start", { time: formatTime(group.orders[0].created_at) })}
+                    </span>
                   </div>
-                  <span className="text-[11px] text-muted">
-                    เริ่ม {formatTime(group.orders[0].created_at)}
-                  </span>
-                </div>
-                <div className="mt-4 text-2xl font-semibold tabular-nums tracking-tight text-ink">
-                  {formatKIP(group.total)}
-                </div>
-                <div className="mt-1 text-xs font-medium text-muted transition group-hover:text-ink">
-                  รับชำระ →
-                </div>
-              </button>
-            ))}
-          </div>
-        </>
+                  <div className="mt-4 text-2xl font-semibold tabular-nums tracking-tight text-ink">
+                    {formatKIP(group.total)}
+                  </div>
+                  <div className="mt-1 text-xs font-medium text-muted transition group-hover:text-ink">
+                    {t("bill.unpaid.settle_cta")}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </>
+        )
+      ) : (
+        <SettledBills
+          settledOrders={settledOrders}
+          tables={tables}
+          menus={menus}
+          restaurantName={restaurantName}
+          serviceChargePct={serviceChargePct}
+          vatPct={vatPct}
+          paymentQrUrl={paymentQrUrl}
+        />
       )}
 
       {selectedGroup && (
@@ -286,5 +347,37 @@ export default function BillsView({
         />
       )}
     </>
+  );
+}
+
+interface TabButtonProps {
+  label: string;
+  count?: number;
+  active: boolean;
+  onClick: () => void;
+}
+
+function TabButton({ label, count, active, onClick }: TabButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
+        active
+          ? "bg-surface text-ink shadow-sm"
+          : "text-muted hover:text-ink"
+      }`}
+    >
+      {label}
+      {count !== undefined && count > 0 ? (
+        <span
+          className={`ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums ${
+            active ? "bg-ink text-surface" : "bg-line text-muted"
+          }`}
+        >
+          {count}
+        </span>
+      ) : null}
+    </button>
   );
 }
