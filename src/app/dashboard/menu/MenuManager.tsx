@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { formatKIP } from "@/lib/format";
@@ -48,6 +48,7 @@ export default function MenuManager({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [catEditingId, setCatEditingId] = useState<string | null>(null);
+  const [nameEditingId, setNameEditingId] = useState<string | null>(null);
 
   const categoryMap = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
@@ -115,7 +116,6 @@ export default function MenuManager({
         price: Number(price),
         image_url: imageUrl,
         available: true,
-        bundles: [],
       })
       .select()
       .single();
@@ -149,6 +149,35 @@ export default function MenuManager({
       prev.map((m) => (m.id === menu.id ? { ...m, category_id: newCategoryId } : m)),
     );
     await supabase.from("menus").update({ category_id: newCategoryId }).eq("id", menu.id);
+  }
+
+  async function updateMenuNames(
+    menu: Menu,
+    next: { name_th: string; name_lo: string; name_en: string },
+  ): Promise<boolean> {
+    const th = next.name_th.trim();
+    const lo = next.name_lo.trim();
+    const en = next.name_en.trim();
+    if (!th && !lo && !en) return false;
+    // `name` is NOT NULL — fall back to whichever language is filled.
+    const primary = th || lo || en;
+    const patch = {
+      name: primary,
+      name_lo: lo || null,
+      name_en: en || null,
+    };
+    setMenus((prev) =>
+      prev.map((m) => (m.id === menu.id ? { ...m, ...patch } : m)),
+    );
+    const { error } = await supabase
+      .from("menus")
+      .update(patch)
+      .eq("id", menu.id);
+    if (error) {
+      toast.error(t("mgr.menu.add_failed", { error: error.message }));
+      return false;
+    }
+    return true;
   }
 
   async function deleteMenu(menu: Menu): Promise<void> {
@@ -331,9 +360,17 @@ export default function MenuManager({
 
                     {/* รายละเอียดเมนู */}
                     <div className="min-w-0 flex-1 space-y-1">
-                      <div className={`truncate text-sm font-semibold tracking-tight transition ${!isAvailable ? "text-muted line-through" : "text-ink"}`}>
-                        {pickName(menu, locale)}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setNameEditingId(menu.id)}
+                        className={`group/name flex w-full min-w-0 items-center gap-1.5 truncate text-left text-sm font-semibold tracking-tight transition hover:text-accent-600 ${!isAvailable ? "text-muted line-through" : "text-ink"}`}
+                        aria-label={t("common.edit")}
+                      >
+                        <span className="truncate">{pickName(menu, locale)}</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3 w-3 shrink-0 opacity-0 transition group-hover/name:opacity-60">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487a2.06 2.06 0 1 1 2.915 2.914L7.5 19.673 3 21l1.327-4.5L16.862 4.487Z" />
+                        </svg>
+                      </button>
                       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs">
                         <span className={`font-bold tabular-nums ${!isAvailable ? "text-muted" : "text-ink"}`}>
                           {formatKIP(menu.price)}
@@ -419,6 +456,143 @@ export default function MenuManager({
             );
           })()
         : null}
+
+      {nameEditingId
+        ? (() => {
+            const target = menus.find((m) => m.id === nameEditingId);
+            if (!target) return null;
+            return (
+              <MenuNameEditModal
+                menu={target}
+                onSave={async (vals) => {
+                  const ok = await updateMenuNames(target, vals);
+                  if (ok) setNameEditingId(null);
+                  return ok;
+                }}
+                onClose={() => setNameEditingId(null)}
+              />
+            );
+          })()
+        : null}
+    </div>
+  );
+}
+
+interface MenuNameEditModalProps {
+  menu: Menu;
+  onSave: (vals: { name_th: string; name_lo: string; name_en: string }) => Promise<boolean>;
+  onClose: () => void;
+}
+
+function MenuNameEditModal({ menu, onSave, onClose }: MenuNameEditModalProps) {
+  const { t } = useT();
+  const [nameTh, setNameTh] = useState(menu.name ?? "");
+  const [nameLo, setNameLo] = useState(menu.name_lo ?? "");
+  const [nameEn, setNameEn] = useState(menu.name_en ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  async function handleSubmit(e: React.FormEvent): Promise<void> {
+    e.preventDefault();
+    setError(null);
+    if (!nameTh.trim() && !nameLo.trim() && !nameEn.trim()) {
+      setError(t("mgr.menu.error.no_name"));
+      return;
+    }
+    setBusy(true);
+    const ok = await onSave({ name_th: nameTh, name_lo: nameLo, name_en: nameEn });
+    if (!ok) setBusy(false);
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-[70] flex items-end justify-center bg-ink/40 px-4 pb-4 animate-fade-in sm:items-center sm:pb-0"
+    >
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={handleSubmit}
+        className="w-full max-w-sm animate-slide-up overflow-hidden rounded-2xl bg-surface shadow-pop"
+      >
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
+          <h3 className="text-base font-semibold tracking-tight text-ink">
+            {t("common.edit")} — {t("mgr.menu.name_th")}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 text-muted transition hover:bg-canvas hover:text-ink"
+            aria-label={t("common.close")}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="space-y-4 px-5 py-4">
+          <FormField label={t("mgr.menu.name_th")} hint={t("mgr.menu.name_th.hint")}>
+            <input
+              type="text"
+              value={nameTh}
+              onChange={(e) => setNameTh(e.target.value)}
+              className={input}
+              placeholder={t("mgr.menu.name_th.placeholder")}
+              autoFocus
+            />
+          </FormField>
+          <FormField label={t("mgr.menu.name_lo")} hint={t("mgr.menu.name_lo.hint")}>
+            <input
+              type="text"
+              value={nameLo}
+              onChange={(e) => setNameLo(e.target.value)}
+              className={input}
+              placeholder={t("mgr.menu.name_lo.placeholder")}
+            />
+          </FormField>
+          <FormField label={t("mgr.menu.name_en")} hint={t("mgr.menu.name_en.hint")}>
+            <input
+              type="text"
+              value={nameEn}
+              onChange={(e) => setNameEn(e.target.value)}
+              className={input}
+              placeholder={t("mgr.menu.name_en.placeholder")}
+            />
+          </FormField>
+          {error ? (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+              {error}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="flex gap-2 border-t border-line bg-canvas/40 px-5 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-canvas"
+          >
+            {t("common.cancel")}
+          </button>
+          <button
+            type="submit"
+            disabled={busy}
+            className={`${buttonPrimary} flex-1 disabled:opacity-70`}
+          >
+            {busy ? t("common.saving") : t("common.save")}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -444,9 +618,18 @@ function CategoryPickerModal({
   onSelect,
   onClose,
 }: CategoryPickerModalProps) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
   return (
     <div
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
       className="fixed inset-0 z-[70] flex items-end justify-center bg-ink/40 px-4 pb-4 animate-fade-in sm:items-center sm:pb-0"
     >
       <div

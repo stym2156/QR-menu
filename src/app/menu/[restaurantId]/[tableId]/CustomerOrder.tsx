@@ -11,6 +11,7 @@ import { useCart } from "./hooks/useCart";
 import { useTableOrders } from "./hooks/useTableOrders";
 import { BillModal } from "./components/BillModal";
 import { CallStaffModal } from "./components/CallStaffModal";
+import { CartSheet } from "./components/CartSheet";
 import { FilterChip } from "./components/FilterChip";
 import { FloatingButton } from "./components/FloatingButton";
 import { MenuCard } from "./components/MenuCard";
@@ -69,6 +70,7 @@ export default function CustomerOrder({
   const [noteEditing, setNoteEditing] = useState<string | null>(null);
   const [showBill, setShowBill] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string | "all">("all");
 
   const activeOrders = useMemo(
@@ -282,14 +284,37 @@ export default function CustomerOrder({
               <span className="hidden sm:inline">{t("cust.clear_cart.button")}</span>
             </button>
             <button
+              type="button"
+              onClick={() => setCartOpen(true)}
+              disabled={submitting}
+              className="relative flex h-[3.25rem] shrink-0 items-center justify-center rounded-2xl border border-line bg-surface px-3.5 text-ink transition hover:border-ink/30 hover:bg-canvas disabled:opacity-50"
+              aria-label={t("cust.cart")}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                className="h-5 w-5"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l3-8H6.4M7 13l-1.6-8M7 13l-2.3 6h13.6M10 21a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm8 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" />
+              </svg>
+              {totalQty > 0 ? (
+                <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold leading-none text-white shadow-sm ring-2 ring-surface">
+                  {totalQty > 99 ? "99+" : totalQty}
+                </span>
+              ) : null}
+            </button>
+            <button
               onClick={submitOrder}
               disabled={submitting || !shopOpen}
               className="group flex flex-1 items-center justify-between rounded-2xl bg-ink px-5 py-3.5 text-surface shadow-ink transition active:scale-[0.99] disabled:opacity-50 disabled:active:scale-100"
             >
               <span className="flex items-center gap-2.5">
-                <span className="flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-surface/15 px-1.5 text-xs font-semibold tabular-nums">
+                <span className="flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-blue-500/15 px-1.5 text-xs font-semibold text-blue-400 tabular-nums">
                   {totalQty}
                 </span>
+
                 <span className="text-sm font-medium">
                   {!shopOpen
                     ? t("cust.shop_closed_short")
@@ -322,6 +347,38 @@ export default function CustomerOrder({
           restaurantId={restaurantId}
           tableId={tableId}
           onClose={() => setCallOpen(false)}
+        />
+      )}
+
+      {cartOpen && (
+        <CartSheet
+          cart={cart}
+          menuMap={menuMap}
+          shopOpen={shopOpen}
+          submitting={submitting}
+          onClose={() => setCartOpen(false)}
+          onAdd={(menuId) => add(menuId)}
+          onRemove={(menuId) => remove(menuId)}
+          onClear={async () => {
+            const ok = await confirm({
+              title: t("cust.clear_cart.title"),
+              description: t("cust.clear_cart.desc"),
+              confirmText: t("cust.clear_cart.confirm"),
+              tone: "danger",
+            });
+            if (ok) {
+              clear();
+              setCartOpen(false);
+            }
+          }}
+          onSubmit={async () => {
+            setCartOpen(false);
+            await submitOrder();
+          }}
+          onEditNote={(menuId) => {
+            setNoteEditing(menuId);
+            setCartOpen(false);
+          }}
         />
       )}
     </>

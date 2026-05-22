@@ -4,8 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useT } from "@/lib/i18n/I18nProvider";
 import type { RestaurantRole } from "@/lib/membership";
+import { useNavBadges, type NavBadges } from "./useNavBadges";
 
 type Role = RestaurantRole;
+
+// Maps an item href → which badge count (from useNavBadges) to render on it.
+const BADGE_KEY: Record<string, keyof NavBadges | undefined> = {
+  "/dashboard/kitchen": "kitchen",
+  "/dashboard/bills": "unpaidTables",
+};
 
 interface NavItem {
   href: string;
@@ -159,9 +166,15 @@ function isActive(pathname: string | null, href: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-export default function TopNav({ role = "owner" }: { role?: RestaurantRole }) {
+interface TopNavProps {
+  role?: RestaurantRole;
+  restaurantId?: string | null;
+}
+
+export default function TopNav({ role = "owner", restaurantId = null }: TopNavProps) {
   const pathname = usePathname();
   const { t } = useT();
+  const badges = useNavBadges(restaurantId);
   // Items without allowedRoles default to owner-only.
   const items = NAV.filter((item) => {
     const allowed = item.allowedRoles ?? ["owner"];
@@ -172,6 +185,8 @@ export default function TopNav({ role = "owner" }: { role?: RestaurantRole }) {
     <nav className="no-scrollbar -mx-4 flex gap-x-1 overflow-x-auto lg:gap-x-1.5 lg:overflow-visible">
       {items.map((item) => {
         const active = isActive(pathname, item.href);
+        const badgeKey = BADGE_KEY[item.href];
+        const count = badgeKey ? badges[badgeKey] : 0;
         return (
           <Link
             key={item.href}
@@ -182,8 +197,16 @@ export default function TopNav({ role = "owner" }: { role?: RestaurantRole }) {
                 : "text-muted hover:bg-canvas hover:text-ink"
             }`}
           >
-            <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center [&>svg]:h-full [&>svg]:w-full">
+            <span className="relative flex h-[18px] w-[18px] shrink-0 items-center justify-center [&>svg]:h-full [&>svg]:w-full">
               {item.icon}
+              {count > 0 ? (
+                <span
+                  className="absolute -right-1.5 -top-1.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white shadow-sm ring-2 ring-surface"
+                  aria-label={`${count}`}
+                >
+                  {count > 9 ? "9+" : count}
+                </span>
+              ) : null}
             </span>
             <span>{t(item.labelKey)}</span>
           </Link>

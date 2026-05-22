@@ -46,11 +46,6 @@ export type Category = {
   created_at: string;
 };
 
-export type MenuBundle = {
-  label: string;
-  qty: number;
-};
-
 export type Menu = {
   id: string;
   restaurant_id: string;
@@ -61,7 +56,6 @@ export type Menu = {
   price: number;
   image_url: string | null;
   available: boolean;
-  bundles: MenuBundle[];
   created_at: string;
 };
 

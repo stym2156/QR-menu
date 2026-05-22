@@ -61,7 +61,7 @@ export default async function DashboardLayout({
               </div>
             </div>
             <div className="border-t border-line py-2">
-              <TopNav role={role} />
+              <TopNav role={role} restaurantId={membership?.restaurantId ?? null} />
             </div>
           </div>
         </header>

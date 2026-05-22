@@ -92,11 +92,18 @@ export default function CategoryManager({ restaurantId, initialCategories }: Pro
   }
 
   async function renameCategory(category: Category, newName: string): Promise<void> {
-    if (!newName.trim() || newName === category.name) return;
+    const next = newName.trim();
+    if (!next || next === category.name) return;
+    // If name_lo / name_en were auto-mirrored from `name` (i.e. the owner only
+    // typed one language), sync them too so the rename actually takes effect
+    // for customers viewing in those locales.
+    const patch: { name: string; name_lo?: string; name_en?: string } = { name: next };
+    if (category.name_lo && category.name_lo === category.name) patch.name_lo = next;
+    if (category.name_en && category.name_en === category.name) patch.name_en = next;
     setCategories((prev) =>
-      prev.map((c) => (c.id === category.id ? { ...c, name: newName } : c)),
+      prev.map((c) => (c.id === category.id ? { ...c, ...patch } : c)),
     );
-    await supabase.from("categories").update({ name: newName }).eq("id", category.id);
+    await supabase.from("categories").update(patch).eq("id", category.id);
   }
 
   async function move(category: Category, direction: -1 | 1): Promise<void> {
