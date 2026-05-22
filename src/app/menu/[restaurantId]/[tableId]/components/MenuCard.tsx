@@ -41,7 +41,7 @@ export function MenuCard({
       <button
         type="button"
         onClick={onAdd}
-        className="block w-full text-left active:scale-[0.98] transition-transform"
+        className="relative block w-full text-left active:scale-[0.98] transition-transform"
         aria-label={`${t("cust.add_to_order")} ${displayName}`}
       >
         <div className="relative aspect-square w-full overflow-hidden bg-canvas">
@@ -65,7 +65,7 @@ export function MenuCard({
           ) : null}
         </div>
 
-        <div className="space-y-1 px-3 py-2.5">
+        <div className="space-y-1 px-3 py-2.5 pr-12">
           <div className="line-clamp-2 min-h-[2.5em] text-[13px] font-medium leading-snug text-ink">
             {displayName}
           </div>
@@ -73,6 +73,26 @@ export function MenuCard({
             {formatKIP(menu.price)}
           </div>
         </div>
+
+        {/* Blue + affordance, anchored inside the main button so the click
+            always reaches onAdd — even when the card grows (note row, etc.)
+            below changes the <li> bottom. */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-2.5 right-2.5 flex h-9 w-9 items-center justify-center rounded-full bg-sky-500 text-white shadow-lg shadow-sky-500/40 ring-2 ring-surface transition group-hover:scale-110"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-5 w-5"
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </span>
       </button>
 
       {selected ? (

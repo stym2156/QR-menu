@@ -23,7 +23,6 @@ export function CallStaffModal({
   const [error, setError] = useState<string | null>(null);
 
   const presets = [
-    t("cust.call.preset.water"),
     t("cust.call.preset.utensils"),
     t("cust.call.preset.tissue"),
     t("cust.call.preset.bill"),

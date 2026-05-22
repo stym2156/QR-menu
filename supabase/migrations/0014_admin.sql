@@ -63,23 +63,15 @@ create policy feedback_admin_update on public.feedback
   with check (is_app_admin(auth.uid()));
 
 -- ============================================================
--- 4. Seed initial admin (test@test.com)
+-- 4. Provision your initial admin manually
 -- ============================================================
--- Conditional: only insert if the user exists. If you haven't signed up
--- with test@test.com yet, this is a no-op — sign up first, then re-run
--- this migration or insert manually:
+-- Run this ONCE in Supabase SQL Editor with your real admin email.
+-- The migration itself no longer seeds a fixed email — auto-seeding
+-- a hard-coded email is a footgun: anyone who later registers with
+-- that email on the live DB silently becomes a platform admin.
+--
 --   insert into public.app_admins (user_id)
---   select id from auth.users where email = 'your@email.com'
+--   select id from auth.users where email = 'your-real-admin@example.com'
 --   on conflict do nothing;
-do $$
-declare
-  v_uid uuid;
-begin
-  select id into v_uid from auth.users where email = 'test@test.com' limit 1;
-  if v_uid is not null then
-    insert into public.app_admins (user_id) values (v_uid)
-      on conflict (user_id) do nothing;
-  end if;
-end $$;
 
 notify pgrst, 'reload schema';

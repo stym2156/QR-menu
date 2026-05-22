@@ -1,12 +1,17 @@
 -- ============================================================
--- ShopQR / QR Menu — Full Database Setup (combined 0001-0009)
+-- ShopQR / QR Menu — Full Database Setup (combined 0001-0015)
 -- ============================================================
 -- Run ONCE in Supabase Dashboard → SQL Editor → New query → Run.
 -- Idempotent: safe to re-run; will not duplicate or break existing data.
 --
--- This file is the equivalent of running migrations 0001 through 0009
+-- This file is the equivalent of running migrations 0001 through 0015
 -- in order. After running this, your database matches the latest schema
 -- the application expects.
+--
+-- After running this file, provision your first platform admin:
+--   insert into public.app_admins (user_id)
+--   select id from auth.users where email = 'your-admin@example.com'
+--   on conflict do nothing;
 -- ============================================================
 
 create extension if not exists "pgcrypto";
@@ -483,6 +488,308 @@ drop policy if exists "promotion-images owner delete" on storage.objects;
 create policy "promotion-images owner delete" on storage.objects
   for delete to authenticated
   using (bucket_id = 'promotion-images' and owner = auth.uid());
+
+-- ============================================================
+-- 0011: Payment QR per restaurant + storage bucket
+-- ============================================================
+
+alter table public.restaurants
+  add column if not exists payment_qr_url text;
+
+insert into storage.buckets (id, name, public)
+values ('payment-qr', 'payment-qr', true)
+on conflict (id) do nothing;
+
+drop policy if exists "payment-qr public read" on storage.objects;
+create policy "payment-qr public read" on storage.objects
+  for select using (bucket_id = 'payment-qr');
+
+drop policy if exists "payment-qr owner write" on storage.objects;
+create policy "payment-qr owner write" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'payment-qr');
+
+drop policy if exists "payment-qr owner update" on storage.objects;
+create policy "payment-qr owner update" on storage.objects
+  for update to authenticated
+  using (bucket_id = 'payment-qr' and owner = auth.uid());
+
+drop policy if exists "payment-qr owner delete" on storage.objects;
+create policy "payment-qr owner delete" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'payment-qr' and owner = auth.uid());
+
+-- ============================================================
+-- 0012: Cook/waiter roles + invite-link signup flow
+-- ============================================================
+
+-- Extend role enum
+do $$ begin
+  alter type restaurant_role add value if not exists 'cook';
+exception when others then null; end $$;
+do $$ begin
+  alter type restaurant_role add value if not exists 'waiter';
+exception when others then null; end $$;
+
+-- Invites table
+-- NOTE: the original migration 0012 has a CHECK constraint preventing 'owner'
+-- role here. We OMIT it in setup_all.sql because Postgres can't reference a
+-- freshly-added enum value (cook/waiter from above) inside a CHECK constraint
+-- in the same transaction (error 55P04). The app code only ever inserts
+-- cook/waiter (see StaffManager.tsx createInvite), so DB-level enforcement
+-- is not load-bearing. If you want the constraint, re-run this block in a
+-- separate SQL Editor query AFTER the rest of the script has committed:
+--   alter table public.restaurant_invites
+--     add constraint invite_role_not_owner check (role in ('cook', 'waiter'));
+create table if not exists public.restaurant_invites (
+  id uuid primary key default gen_random_uuid(),
+  restaurant_id uuid not null references public.restaurants(id) on delete cascade,
+  token text not null unique,
+  role restaurant_role not null,
+  created_by uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  used_by uuid references auth.users(id) on delete set null,
+  used_at timestamptz,
+  revoked_at timestamptz
+);
+
+create index if not exists invites_restaurant_idx
+  on public.restaurant_invites(restaurant_id);
+create index if not exists invites_token_idx
+  on public.restaurant_invites(token);
+
+alter table public.restaurant_invites enable row level security;
+
+drop policy if exists invites_owner_manage on public.restaurant_invites;
+create policy invites_owner_manage on public.restaurant_invites
+  for all to authenticated
+  using (is_restaurant_owner(restaurant_id))
+  with check (is_restaurant_owner(restaurant_id));
+
+-- RPC: lookup invite by token (anon callable)
+create or replace function public.lookup_invite(token_input text)
+returns table (
+  id uuid,
+  restaurant_id uuid,
+  restaurant_name text,
+  role restaurant_role,
+  used_at timestamptz,
+  revoked_at timestamptz
+)
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select i.id, i.restaurant_id, r.name as restaurant_name, i.role, i.used_at, i.revoked_at
+  from public.restaurant_invites i
+  join public.restaurants r on r.id = i.restaurant_id
+  where i.token = token_input
+  limit 1;
+$$;
+
+grant execute on function public.lookup_invite(text) to anon, authenticated;
+
+-- Updated signup trigger: honor invite_token from user metadata
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  invite_token text;
+  invite_row public.restaurant_invites%rowtype;
+  new_restaurant_id uuid;
+begin
+  invite_token := nullif(new.raw_user_meta_data->>'invite_token', '');
+
+  if invite_token is not null then
+    -- Invite-based signup: attach to existing restaurant, do NOT create new one.
+    select * into invite_row
+    from public.restaurant_invites
+    where token = invite_token
+    limit 1;
+
+    if invite_row.id is null then
+      raise exception 'INVITE_NOT_FOUND';
+    end if;
+    if invite_row.used_at is not null then
+      raise exception 'INVITE_ALREADY_USED';
+    end if;
+    if invite_row.revoked_at is not null then
+      raise exception 'INVITE_REVOKED';
+    end if;
+
+    insert into public.restaurant_members (restaurant_id, user_id, role, invited_email)
+    values (invite_row.restaurant_id, new.id, invite_row.role, new.email)
+    on conflict (restaurant_id, user_id) do nothing;
+
+    update public.restaurant_invites
+    set used_by = new.id, used_at = now()
+    where id = invite_row.id;
+
+    return new;
+  end if;
+
+  -- Default: owner signup — create new restaurant
+  insert into public.restaurants (user_id, name)
+  values (
+    new.id,
+    coalesce(nullif(new.raw_user_meta_data->>'restaurant_name', ''), 'My Restaurant')
+  )
+  returning id into new_restaurant_id;
+
+  insert into public.restaurant_members (restaurant_id, user_id, role)
+  values (new_restaurant_id, new.id, 'owner');
+
+  return new;
+end;
+$$;
+
+-- RPC: accept invite when ALREADY logged in
+create or replace function public.accept_invite(token_input text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  invite_row public.restaurant_invites%rowtype;
+  caller uuid;
+begin
+  caller := auth.uid();
+  if caller is null then
+    raise exception 'NOT_AUTHENTICATED';
+  end if;
+
+  select * into invite_row
+  from public.restaurant_invites
+  where token = token_input
+  limit 1;
+
+  if invite_row.id is null then raise exception 'INVITE_NOT_FOUND'; end if;
+  if invite_row.used_at is not null then raise exception 'INVITE_ALREADY_USED'; end if;
+  if invite_row.revoked_at is not null then raise exception 'INVITE_REVOKED'; end if;
+
+  insert into public.restaurant_members (restaurant_id, user_id, role, invited_email)
+  values (invite_row.restaurant_id, caller, invite_row.role,
+          (select email from auth.users where id = caller))
+  on conflict (restaurant_id, user_id) do nothing;
+
+  update public.restaurant_invites
+  set used_by = caller, used_at = now()
+  where id = invite_row.id;
+
+  return invite_row.restaurant_id;
+end;
+$$;
+
+grant execute on function public.accept_invite(text) to authenticated;
+
+-- Helper: is_restaurant_waiter
+-- NOTE: role::text = 'waiter' (not role = 'waiter') because the 'waiter'
+-- enum value was added via ALTER TYPE earlier in this same transaction.
+-- A SQL function body is validated at CREATE TIME, so comparing against
+-- the literal directly fails with 55P04. Casting to text bypasses the
+-- enum resolution.
+create or replace function public.is_restaurant_waiter(rid uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.restaurant_members
+    where restaurant_id = rid and user_id = auth.uid() and role::text = 'waiter'
+  );
+$$;
+
+-- Tables: waiter can UPDATE; only owner can INSERT/DELETE
+drop policy if exists tables_owner_write on public.tables;
+drop policy if exists tables_owner_insert on public.tables;
+drop policy if exists tables_owner_delete on public.tables;
+drop policy if exists tables_member_update on public.tables;
+
+create policy tables_owner_insert on public.tables
+  for insert to authenticated
+  with check (is_restaurant_owner(restaurant_id));
+
+create policy tables_owner_delete on public.tables
+  for delete to authenticated
+  using (is_restaurant_owner(restaurant_id));
+
+create policy tables_member_update on public.tables
+  for update to authenticated
+  using (is_restaurant_owner(restaurant_id) or is_restaurant_waiter(restaurant_id))
+  with check (is_restaurant_owner(restaurant_id) or is_restaurant_waiter(restaurant_id));
+
+-- ============================================================
+-- 0013: Optional Lao + English names for menus & categories
+-- ============================================================
+
+alter table public.menus
+  add column if not exists name_lo text,
+  add column if not exists name_en text;
+
+alter table public.categories
+  add column if not exists name_lo text,
+  add column if not exists name_en text;
+
+-- ============================================================
+-- 0014: Platform admin role
+-- ============================================================
+
+create table if not exists public.app_admins (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  added_at timestamptz not null default now()
+);
+
+alter table public.app_admins enable row level security;
+
+drop policy if exists app_admins_self_read on public.app_admins;
+create policy app_admins_self_read on public.app_admins
+  for select to authenticated
+  using (user_id = auth.uid());
+
+create or replace function public.is_app_admin(uid uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.app_admins where user_id = uid);
+$$;
+
+grant execute on function public.is_app_admin(uuid) to authenticated;
+
+-- Restaurants: admin can SELECT/UPDATE/DELETE any row
+drop policy if exists restaurants_admin_all on public.restaurants;
+create policy restaurants_admin_all on public.restaurants
+  for all to authenticated
+  using (is_app_admin(auth.uid()))
+  with check (is_app_admin(auth.uid()));
+
+-- Feedback: admin can SELECT/UPDATE any row
+drop policy if exists feedback_admin_read on public.feedback;
+create policy feedback_admin_read on public.feedback
+  for select to authenticated
+  using (is_app_admin(auth.uid()));
+
+drop policy if exists feedback_admin_update on public.feedback;
+create policy feedback_admin_update on public.feedback
+  for update to authenticated
+  using (is_app_admin(auth.uid()))
+  with check (is_app_admin(auth.uid()));
+
+-- ============================================================
+-- 0015: Admin can reply to owner feedback
+-- ============================================================
+
+alter table public.feedback
+  add column if not exists admin_reply text,
+  add column if not exists replied_at timestamptz;
 
 -- ============================================================
 -- Reload PostgREST schema cache so new columns are immediately visible

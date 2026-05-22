@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import QRCode from "qrcode";
 import { createClient } from "@/lib/supabase/client";
@@ -39,6 +39,15 @@ export default function TableManager({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [origin, setOrigin] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Substring match on the stringified table number. Typing "5" matches
+  // table 5, 50–59, 105, 500, etc. — sorted ascending so 5 appears first.
+  const filteredTables = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) return tables;
+    return tables.filter((t) => String(t.table_number).includes(q));
+  }, [tables, searchQuery]);
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -169,22 +178,66 @@ export default function TableManager({
           <>
             <SectionHeading
               title={t("mgr.tbl.list_title")}
-              description={t("mgr.tbl.list_count", { n: tables.length })}
+              description={
+                searchQuery.trim()
+                  ? t("mgr.tbl.search.result", {
+                      found: filteredTables.length,
+                      total: tables.length,
+                    })
+                  : t("mgr.tbl.list_count", { n: tables.length })
+              }
             />
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {tables.map((table) => (
-                <TableCard
-                  key={table.id}
-                  table={table}
-                  restaurantId={restaurantId}
-                  origin={origin}
-                  canManage={canManage}
-                  onDelete={() => deleteTable(table)}
-                  onDownload={() => downloadQR(table)}
-                  onToggleOpen={() => toggleOpen(table)}
-                />
-              ))}
+
+            <div className="relative my-3">
+              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+                  <circle cx="11" cy="11" r="7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m20 20-3.5-3.5" />
+                </svg>
+              </span>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t("mgr.tbl.search.placeholder")}
+                className={`${input} pl-10 pr-10 tabular-nums`}
+                autoComplete="off"
+              />
+              {searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  aria-label={t("mgr.tbl.search.clear")}
+                  className="absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-muted transition hover:bg-canvas hover:text-ink"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              ) : null}
             </div>
+
+            {filteredTables.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-line bg-surface/50 p-8 text-center text-sm text-muted">
+                {t("mgr.tbl.search.no_match", { q: searchQuery.trim() })}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {filteredTables.map((table) => (
+                  <TableCard
+                    key={table.id}
+                    table={table}
+                    restaurantId={restaurantId}
+                    origin={origin}
+                    canManage={canManage}
+                    onDelete={() => deleteTable(table)}
+                    onDownload={() => downloadQR(table)}
+                    onToggleOpen={() => toggleOpen(table)}
+                  />
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>

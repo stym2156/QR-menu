@@ -33,6 +33,8 @@ export type Feedback = {
   category: FeedbackCategory;
   message: string;
   resolved: boolean;
+  admin_reply: string | null;
+  replied_at: string | null;
   created_at: string;
 };
 

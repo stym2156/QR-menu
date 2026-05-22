@@ -17,9 +17,11 @@ export async function isAdmin(supabase: SupabaseClient): Promise<boolean> {
   return !!data;
 }
 
-// Server-side guard for /admin/* routes. Redirects:
-//   - not signed in           → /login
-//   - signed in but not admin → /dashboard
+// Server-side guard for /admin/(authed)/* routes. Redirects to the dedicated
+// /admin/login page in both cases — signed-out and signed-in-but-not-admin.
+// If a non-admin user is signed in, we don't sign them out here (we don't
+// have a writable session in a server component); the login page will reject
+// them and call signOut on re-attempt.
 export async function requireAdmin(supabase: SupabaseClient): Promise<{
   userId: string;
   email: string | null;
@@ -27,12 +29,12 @@ export async function requireAdmin(supabase: SupabaseClient): Promise<{
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/admin/login");
   const { data } = await supabase
     .from("app_admins")
     .select("user_id")
     .eq("user_id", user.id)
     .maybeSingle();
-  if (!data) redirect("/dashboard");
+  if (!data) redirect("/admin/login");
   return { userId: user.id, email: user.email ?? null };
 }

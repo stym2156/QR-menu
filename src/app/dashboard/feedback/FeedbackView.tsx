@@ -192,6 +192,21 @@ export default function FeedbackView({
                 <p className="whitespace-pre-wrap text-sm text-zinc-700">
                   {fb.message}
                 </p>
+                {fb.admin_reply ? (
+                  <div className="mt-3 rounded-xl border-l-2 border-emerald-400 bg-emerald-50/40 px-3 py-2 text-sm">
+                    <div className="mb-1 flex items-center gap-2 text-[11px] font-medium text-emerald-700">
+                      <span>💬 คำตอบจากทีมงาน</span>
+                      {fb.replied_at ? (
+                        <span className="text-muted tabular-nums">
+                          · {formatDateTime(fb.replied_at)}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="whitespace-pre-wrap text-zinc-700">
+                      {fb.admin_reply}
+                    </p>
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

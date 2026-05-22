@@ -49,10 +49,58 @@ export default function MenuManager({
   const [error, setError] = useState<string | null>(null);
   const [catEditingId, setCatEditingId] = useState<string | null>(null);
   const [nameEditingId, setNameEditingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const categoryMap = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
     [categories],
+  );
+
+  // Group menus into category sections, applying the search filter.
+  // Sections with zero items after filtering are dropped from the output.
+  const groupedMenus = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const filtered = q
+      ? menus.filter((m) => {
+          const th = m.name?.toLowerCase() ?? "";
+          const lo = m.name_lo?.toLowerCase() ?? "";
+          const en = m.name_en?.toLowerCase() ?? "";
+          return th.includes(q) || lo.includes(q) || en.includes(q);
+        })
+      : menus;
+
+    const sections: Array<{
+      id: string | null;
+      name: string;
+      items: Menu[];
+    }> = [];
+    const idxById = new Map<string, number>();
+    for (const c of categories) {
+      idxById.set(c.id, sections.length);
+      sections.push({ id: c.id, name: pickName(c, locale), items: [] });
+    }
+    const uncategorized: Menu[] = [];
+    for (const m of filtered) {
+      const idx = m.category_id ? idxById.get(m.category_id) : undefined;
+      if (idx !== undefined) {
+        sections[idx].items.push(m);
+      } else {
+        uncategorized.push(m);
+      }
+    }
+    if (uncategorized.length > 0) {
+      sections.push({
+        id: null,
+        name: t("mgr.menu.uncategorized"),
+        items: uncategorized,
+      });
+    }
+    return sections.filter((s) => s.items.length > 0);
+  }, [menus, categories, locale, searchQuery, t]);
+
+  const filteredTotal = useMemo(
+    () => groupedMenus.reduce((sum, g) => sum + g.items.length, 0),
+    [groupedMenus],
   );
 
   async function createCategoryInline(name: string): Promise<Category | null> {
@@ -151,9 +199,16 @@ export default function MenuManager({
     await supabase.from("menus").update({ category_id: newCategoryId }).eq("id", menu.id);
   }
 
-  async function updateMenuNames(
+  async function updateMenuFields(
     menu: Menu,
-    next: { name_th: string; name_lo: string; name_en: string },
+    next: {
+      name_th: string;
+      name_lo: string;
+      name_en: string;
+      price: number;
+      imageFile: File | null;
+      removeImage: boolean;
+    },
   ): Promise<boolean> {
     const th = next.name_th.trim();
     const lo = next.name_lo.trim();
@@ -161,10 +216,37 @@ export default function MenuManager({
     if (!th && !lo && !en) return false;
     // `name` is NOT NULL — fall back to whichever language is filled.
     const primary = th || lo || en;
+
+    // Resolve final image_url: explicit remove → null; new upload → new URL;
+    // otherwise keep existing.
+    let nextImageUrl: string | null = menu.image_url ?? null;
+    if (next.removeImage) {
+      nextImageUrl = null;
+    } else if (next.imageFile) {
+      const compressed = await compressImage(next.imageFile).catch(
+        () => next.imageFile!,
+      );
+      const ext = compressed.name.split(".").pop() ?? "jpg";
+      const path = `${restaurantId}/${randomId()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("menu-images")
+        .upload(path, compressed, { cacheControl: "3600", upsert: false });
+      if (uploadError) {
+        toast.error(t("mgr.menu.upload_failed", { error: uploadError.message }));
+        return false;
+      }
+      const { data: publicUrl } = supabase.storage
+        .from("menu-images")
+        .getPublicUrl(path);
+      nextImageUrl = publicUrl.publicUrl;
+    }
+
     const patch = {
       name: primary,
       name_lo: lo || null,
       name_en: en || null,
+      price: next.price,
+      image_url: nextImageUrl,
     };
     setMenus((prev) =>
       prev.map((m) => (m.id === menu.id ? { ...m, ...patch } : m)),
@@ -320,14 +402,65 @@ export default function MenuManager({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line pb-4">
               <SectionHeading
                 title={t("mgr.menu.list_title")}
-                description={t("mgr.menu.list_count", { n: menus.length })}
+                description={
+                  searchQuery.trim()
+                    ? t("mgr.menu.search.result", {
+                        found: filteredTotal,
+                        total: menus.length,
+                      })
+                    : t("mgr.menu.list_count", { n: menus.length })
+                }
               />
             </div>
-            
-            <ul className="grid grid-cols-1 gap-3">
-              {menus.map((menu) => {
-                const isAvailable = menu.available;
-                return (
+
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+                  <circle cx="11" cy="11" r="7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m20 20-3.5-3.5" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t("mgr.menu.search.placeholder")}
+                className={`${input} pl-10 pr-10`}
+                autoComplete="off"
+              />
+              {searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  aria-label={t("mgr.menu.search.clear")}
+                  className="absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-muted transition hover:bg-canvas hover:text-ink"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              ) : null}
+            </div>
+
+            {groupedMenus.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-line bg-surface/50 p-8 text-center text-sm text-muted">
+                {t("mgr.menu.search.no_match", { q: searchQuery.trim() })}
+              </div>
+            ) : (
+              groupedMenus.map((group) => (
+                <section key={group.id ?? "uncat"} className="space-y-2">
+                  <div className="flex items-baseline justify-between border-b border-line/60 pb-1.5">
+                    <h3 className="text-sm font-semibold tracking-tight text-ink">
+                      {group.name}
+                    </h3>
+                    <span className="text-[11px] text-muted tabular-nums">
+                      {t("mgr.menu.list_count", { n: group.items.length })}
+                    </span>
+                  </div>
+                  <ul className="grid grid-cols-1 gap-3">
+                    {group.items.map((menu) => {
+                      const isAvailable = menu.available;
+                      return (
                   <li
                     key={menu.id}
                     className={`overflow-hidden rounded-xl border bg-surface shadow-sm transition-all duration-200 hover:shadow-md hover:border-line/80 ${
@@ -428,9 +561,12 @@ export default function MenuManager({
                     </div>
                   </div>
                   </li>
-                );
-              })}
-            </ul>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ))
+            )}
           </>
         )}
       </div>
@@ -462,10 +598,10 @@ export default function MenuManager({
             const target = menus.find((m) => m.id === nameEditingId);
             if (!target) return null;
             return (
-              <MenuNameEditModal
+              <MenuEditModal
                 menu={target}
                 onSave={async (vals) => {
-                  const ok = await updateMenuNames(target, vals);
+                  const ok = await updateMenuFields(target, vals);
                   if (ok) setNameEditingId(null);
                   return ok;
                 }}
@@ -478,17 +614,30 @@ export default function MenuManager({
   );
 }
 
-interface MenuNameEditModalProps {
+interface MenuEditModalProps {
   menu: Menu;
-  onSave: (vals: { name_th: string; name_lo: string; name_en: string }) => Promise<boolean>;
+  onSave: (vals: {
+    name_th: string;
+    name_lo: string;
+    name_en: string;
+    price: number;
+    imageFile: File | null;
+    removeImage: boolean;
+  }) => Promise<boolean>;
   onClose: () => void;
 }
 
-function MenuNameEditModal({ menu, onSave, onClose }: MenuNameEditModalProps) {
+function MenuEditModal({ menu, onSave, onClose }: MenuEditModalProps) {
   const { t } = useT();
   const [nameTh, setNameTh] = useState(menu.name ?? "");
   const [nameLo, setNameLo] = useState(menu.name_lo ?? "");
   const [nameEn, setNameEn] = useState(menu.name_en ?? "");
+  const [price, setPrice] = useState(String(menu.price ?? ""));
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [removeImage, setRemoveImage] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(
+    menu.image_url ?? null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -500,6 +649,31 @@ function MenuNameEditModal({ menu, onSave, onClose }: MenuNameEditModalProps) {
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // Manage preview URL: revoke object URLs on change/unmount to avoid leaks.
+  useEffect(() => {
+    if (removeImage) {
+      setPreviewUrl(null);
+      return;
+    }
+    if (imageFile) {
+      const url = URL.createObjectURL(imageFile);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    setPreviewUrl(menu.image_url ?? null);
+  }, [imageFile, removeImage, menu.image_url]);
+
+  function handlePickImage(e: React.ChangeEvent<HTMLInputElement>): void {
+    const f = e.target.files?.[0] ?? null;
+    setImageFile(f);
+    setRemoveImage(false);
+  }
+
+  function handleRemoveImage(): void {
+    setImageFile(null);
+    setRemoveImage(true);
+  }
+
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     setError(null);
@@ -507,8 +681,20 @@ function MenuNameEditModal({ menu, onSave, onClose }: MenuNameEditModalProps) {
       setError(t("mgr.menu.error.no_name"));
       return;
     }
+    const priceNum = Number(price);
+    if (!Number.isFinite(priceNum) || priceNum < 0) {
+      setError("กรุณาใส่ราคาที่ถูกต้อง (≥ 0)");
+      return;
+    }
     setBusy(true);
-    const ok = await onSave({ name_th: nameTh, name_lo: nameLo, name_en: nameEn });
+    const ok = await onSave({
+      name_th: nameTh,
+      name_lo: nameLo,
+      name_en: nameEn,
+      price: priceNum,
+      imageFile,
+      removeImage,
+    });
     if (!ok) setBusy(false);
   }
 
@@ -568,6 +754,64 @@ function MenuNameEditModal({ menu, onSave, onClose }: MenuNameEditModalProps) {
               className={input}
               placeholder={t("mgr.menu.name_en.placeholder")}
             />
+          </FormField>
+          <FormField label={t("mgr.menu.image")}>
+            {previewUrl ? (
+              <div className="flex items-start gap-3">
+                <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-line bg-canvas">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={previewUrl}
+                    alt=""
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <label className="cursor-pointer rounded-lg border border-line bg-surface px-3 py-1.5 text-center text-xs font-medium text-ink transition hover:bg-canvas">
+                    {t("mgr.menu.image.replace")}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePickImage}
+                      className="sr-only"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-100"
+                  >
+                    {t("mgr.menu.image.remove")}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label className="block cursor-pointer rounded-xl border border-dashed border-line bg-surface/50 px-4 py-3 text-center text-xs font-medium text-muted transition hover:bg-canvas/40 hover:text-ink">
+                {t("mgr.menu.image.choose")}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePickImage}
+                  className="sr-only"
+                />
+              </label>
+            )}
+          </FormField>
+          <FormField label={t("mgr.menu.price")}>
+            <div className="relative rounded-xl">
+              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-base font-medium text-muted/80">
+                ₭
+              </span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className={`${input} pl-9 tabular-nums`}
+                placeholder="0.00"
+              />
+            </div>
           </FormField>
           {error ? (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
