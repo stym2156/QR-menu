@@ -12,13 +12,13 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "ShopQR — QR Ordering",
+  title: "QR Menu— QR Ordering",
   description: "Scan-to-order restaurant platform powered by Supabase.",
-  applicationName: "ShopQR",
+  applicationName: "QR Menu",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "ShopQR",
+    title: "QR Menu",
   },
   formatDetection: { telephone: false },
   icons: {
