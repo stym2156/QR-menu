@@ -6,6 +6,7 @@ import { EmptyState, buttonSecondary } from "@/components/ui";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { pickName } from "@/lib/i18n/localized";
 import { printReceipt } from "./receipt";
+import { BluetoothPrinterButton } from "./BluetoothPrinterButton";
 import type {
   DiningTable,
   Menu,
@@ -271,7 +272,23 @@ export default function SettledBills({
                         }),
                       )}
                     </ul>
-                    <div className="mt-3 flex justify-end">
+                    <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+                      {bill.table ? (
+                        <BluetoothPrinterButton
+                          variant="compact"
+                          job={{
+                            restaurantName,
+                            tableNumber: bill.table.table_number,
+                            orders: bill.orders,
+                            menus,
+                            method: bill.method,
+                            paidAt: bill.paidAt,
+                            serviceChargePct,
+                            vatPct,
+                            locale,
+                          }}
+                        />
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => reprint(bill)}

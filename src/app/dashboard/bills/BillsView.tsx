@@ -9,6 +9,7 @@ import { useT } from "@/lib/i18n/I18nProvider";
 import { printReceipt } from "./receipt";
 import { BillModal, type BillGroup } from "./BillModal";
 import SettledBills from "./SettledBills";
+import { BluetoothPrinterButton } from "./BluetoothPrinterButton";
 import type {
   CallStaffRequest,
   DiningTable,
@@ -332,7 +333,22 @@ export default function BillsView({
               )}
             </span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {lastSettled.table ? (
+              <BluetoothPrinterButton
+                job={{
+                  restaurantName,
+                  tableNumber: lastSettled.table.table_number,
+                  orders: lastSettled.orders,
+                  menus,
+                  method: lastSettled.method,
+                  paidAt: lastSettled.paidAt,
+                  serviceChargePct,
+                  vatPct,
+                  locale,
+                }}
+              />
+            ) : null}
             <button
               onClick={handlePrintLastReceipt}
               className={`${buttonSecondary} py-2 text-xs`}
@@ -346,6 +362,13 @@ export default function BillsView({
               {t("bill.settled.close")}
             </button>
           </div>
+        </div>
+      ) : null}
+
+      {canAct ? (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface px-3 py-2">
+          <span className="text-xs text-muted">{t("bt.helper")}</span>
+          <BluetoothPrinterButton />
         </div>
       ) : null}
 
