@@ -396,6 +396,11 @@ export const DICTIONARIES: Record<Locale, Dict> = {
     "kit.served_check": "เสิร์ฟแล้ว ✓",
     "kit.cancel_toast": "ยกเลิกออเดอร์โต๊ะ {n} แล้ว",
     "kit.cancel_fail": "ยกเลิกไม่สำเร็จ: {error}",
+    "kit.action.print": "🖨 พิมพ์",
+    "kit.action.done": "✓ เสร็จ",
+    "kit.print_toast": "ส่งคำสั่งพิมพ์แล้ว",
+    "kit.done_toast": "ย้ายโต๊ะ {n} ไปประวัติแล้ว",
+    "kit.complete_fail": "ทำเครื่องหมายเสร็จไม่สำเร็จ: {error}",
 
     // cancel order dialog
     "cancel.title": "ยกเลิกออเดอร์",
@@ -1082,6 +1087,11 @@ export const DICTIONARIES: Record<Locale, Dict> = {
     "kit.served_check": "ເສີບແລ້ວ ✓",
     "kit.cancel_toast": "ຍົກເລີກອໍເດີໂຕະ {n} ແລ້ວ",
     "kit.cancel_fail": "ຍົກເລີກບໍ່ສຳເລັດ: {error}",
+    "kit.action.print": "🖨 ພິມ",
+    "kit.action.done": "✓ ສຳເລັດ",
+    "kit.print_toast": "ສົ່ງຄຳສັ່ງພິມແລ້ວ",
+    "kit.done_toast": "ຍ້າຍໂຕະ {n} ໄປປະຫວັດແລ້ວ",
+    "kit.complete_fail": "ໝາຍວ່າສຳເລັດບໍ່ໄດ້: {error}",
 
     "cancel.title": "ຍົກເລີກອໍເດີ",
     "cancel.reason_label": "ເຫດຜົນ",
@@ -1757,6 +1767,11 @@ export const DICTIONARIES: Record<Locale, Dict> = {
     "kit.served_check": "Served ✓",
     "kit.cancel_toast": "Cancelled table {n} order",
     "kit.cancel_fail": "Cancel failed: {error}",
+    "kit.action.print": "🖨 Print",
+    "kit.action.done": "✓ Done",
+    "kit.print_toast": "Print sent",
+    "kit.done_toast": "Moved table {n} to history",
+    "kit.complete_fail": "Couldn't mark complete: {error}",
 
     "cancel.title": "Cancel order",
     "cancel.reason_label": "Reason",

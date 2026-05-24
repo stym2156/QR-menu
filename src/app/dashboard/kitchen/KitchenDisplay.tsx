@@ -65,6 +65,52 @@ export default function KitchenDisplay({
     systemPrintRef.current = systemPrintEnabled;
   }, [systemPrintEnabled]);
 
+  // Mark an order as served + slide it from the active list into history.
+  // Triggered automatically after a successful print (so cook only has to
+  // touch orders that the printer couldn't handle) and manually via the
+  // "Done" button when there's no printer at all.
+  const completeOrder = useCallback(
+    async (order: Order, options?: { silent?: boolean }): Promise<boolean> => {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id ?? null;
+      const now = new Date().toISOString();
+
+      setOrders((prev) => prev.filter((o) => o.id !== order.id));
+      setHistory((prev) => [
+        {
+          ...order,
+          status: "served",
+          completed_at: now,
+          completed_by: uid,
+        },
+        ...prev,
+      ]);
+
+      const { error } = await supabase
+        .from("orders")
+        .update({
+          status: "served",
+          completed_at: now,
+          completed_by: uid,
+        })
+        .eq("id", order.id);
+
+      if (error) {
+        // Rollback optimistic move.
+        setOrders((prev) => [...prev, order]);
+        setHistory((prev) => prev.filter((o) => o.id !== order.id));
+        toast.error(t("kit.complete_fail", { error: error.message }));
+        return false;
+      }
+      if (!options?.silent) {
+        const tableNum = tableMap.get(order.table_id)?.table_number;
+        toast.success(t("kit.done_toast", { n: tableNum ?? "?" }));
+      }
+      return true;
+    },
+    [supabase, toast, t, tableMap],
+  );
+
   const handleNewOrder = useCallback(
     async (order: Order) => {
       const table = tableMap.get(order.table_id);
@@ -81,7 +127,11 @@ export default function KitchenDisplay({
           locale: locale as Locale,
         });
         const result = await printToActivePrinter(bytes);
-        if (!result.ok) {
+        if (result.ok) {
+          // Successful direct print → auto-move to history (silent — the
+          // printout is the cook's notification, no need for a toast too).
+          await completeOrder(order, { silent: true });
+        } else {
           toast.error(t("kitchen_print.auto_failed", { error: result.error }));
           setAutoPrintEnabled(false);
           try {
@@ -95,6 +145,9 @@ export default function KitchenDisplay({
 
       // Path 2: no direct printer — fall back to OS print pipeline if owner
       // enabled it. Best paired with Chrome --kiosk-printing for silent print.
+      // We can't know whether the user pressed Print or Cancel on the dialog
+      // (browsers don't expose that), so we trust the cook to be responsible
+      // — see the toggle description on the printer bar.
       if (systemPrintRef.current && !hasDirect) {
         printKitchenTicketSystem({
           order,
@@ -103,9 +156,10 @@ export default function KitchenDisplay({
           widthMm: kitchenPrintWidth,
           locale: locale as Locale,
         });
+        await completeOrder(order, { silent: true });
       }
     },
-    [tableMap, menus, kitchenPrintWidth, locale, toast, t],
+    [tableMap, menus, kitchenPrintWidth, locale, toast, t, completeOrder],
   );
 
   useKitchenRealtime({
@@ -116,12 +170,14 @@ export default function KitchenDisplay({
     onNewOrder: handleNewOrder,
   });
 
-  async function reprintOrder(order: Order): Promise<void> {
+  // Manual print from the active list. The order moves to history on a
+  // successful print (so cook only sees what's still pending action). For a
+  // pure copy without status change, use the Reprint button in History.
+  async function printActiveOrder(order: Order): Promise<void> {
     const table = tableMap.get(order.table_id);
     const tableNumber = table?.table_number ?? 0;
     const hasDirect = getActivePrinter() !== null;
 
-    // Prefer the direct BT/USB printer when connected.
     if (hasDirect) {
       setBusyId(order.id);
       const bytes = buildKitchenTicketBytes({
@@ -130,33 +186,40 @@ export default function KitchenDisplay({
         tableNumber,
         widthMm: kitchenPrintWidth,
         locale: locale as Locale,
-        badge: t("kitchen_print.reprint"),
       });
       const result = await printToActivePrinter(bytes);
       setBusyId(null);
       if (result.ok) {
-        toast.success(t("kitchen_print.reprint_done"));
+        await completeOrder(order, { silent: true });
+        toast.success(t("kit.print_toast"));
       } else {
         toast.error(t("bt.print_failed", { error: result.error }));
       }
       return;
     }
 
-    // Fall back to system print when enabled — this is how cooks with a
-    // plain wired/Wi-Fi printer can still reprint a ticket.
     if (systemPrintRef.current) {
+      setBusyId(order.id);
       printKitchenTicketSystem({
         order,
         menus,
         tableNumber,
         widthMm: kitchenPrintWidth,
         locale: locale as Locale,
-        badge: t("kitchen_print.reprint"),
       });
+      await completeOrder(order, { silent: true });
+      toast.success(t("kit.print_toast"));
+      setBusyId(null);
       return;
     }
 
     toast.error(t("kitchen_print.not_connected"));
+  }
+
+  async function markActiveDone(order: Order): Promise<void> {
+    setBusyId(order.id);
+    await completeOrder(order);
+    setBusyId(null);
   }
 
   function buildTestBytes(): Uint8Array {
@@ -354,7 +417,8 @@ export default function KitchenDisplay({
           canAct={canAct}
           busyId={busyId}
           onCancel={(o) => setCancelTarget(o)}
-          onReprint={reprintOrder}
+          onPrint={printActiveOrder}
+          onDone={markActiveDone}
         />
       ) : (
         <HistoryList
@@ -415,7 +479,8 @@ interface ActiveListProps {
   canAct: boolean;
   busyId: string | null;
   onCancel: (o: Order) => void;
-  onReprint: (o: Order) => void;
+  onPrint: (o: Order) => void;
+  onDone: (o: Order) => void;
 }
 
 function ActiveList({
@@ -426,7 +491,8 @@ function ActiveList({
   canAct,
   busyId,
   onCancel,
-  onReprint,
+  onPrint,
+  onDone,
 }: ActiveListProps) {
   const { t } = useT();
   if (orders.length === 0) {
@@ -483,7 +549,7 @@ function ActiveList({
               })}
             </ul>
             {canAct ? (
-              <div className="flex justify-end gap-2 border-t border-line pt-2.5">
+              <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-2.5">
                 <button
                   type="button"
                   onClick={() => onCancel(order)}
@@ -494,11 +560,19 @@ function ActiveList({
                 </button>
                 <button
                   type="button"
-                  onClick={() => onReprint(order)}
+                  onClick={() => onPrint(order)}
                   disabled={busyId === order.id}
                   className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-ink transition hover:border-ink/30 disabled:opacity-50"
                 >
-                  {t("kitchen_print.reprint")}
+                  {t("kit.action.print")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDone(order)}
+                  disabled={busyId === order.id}
+                  className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-600 disabled:opacity-50"
+                >
+                  {t("kit.action.done")}
                 </button>
               </div>
             ) : null}
