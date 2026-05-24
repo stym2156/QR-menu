@@ -146,90 +146,112 @@ export function KitchenPrinterBar({
   if (!hydrated) return null;
 
   return (
-    <div className="space-y-2 rounded-xl border border-line bg-surface px-3 py-2.5">
-      {/* Direct connection row — only visible if browser supports BT or USB. */}
-      {btSupported || usbSupported ? (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {!printer ? (
-            <>
-              <span className="text-xs text-muted">
-                {t("kitchen_print.not_connected")}
-              </span>
-              <div className="flex gap-1.5">
-                {btSupported ? (
-                  <button
-                    type="button"
-                    onClick={handleConnectBt}
-                    disabled={connecting !== null}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/30 disabled:opacity-60"
-                  >
-                    <BtIcon />
-                    {connecting === "bt"
-                      ? t("bt.connecting")
-                      : t("kitchen_print.connect_bt")}
-                  </button>
-                ) : null}
-                {usbSupported ? (
-                  <button
-                    type="button"
-                    onClick={handleConnectUsb}
-                    disabled={connecting !== null}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/30 disabled:opacity-60"
-                  >
-                    <UsbIcon />
-                    {connecting === "usb"
-                      ? t("bt.connecting")
-                      : t("kitchen_print.connect_usb")}
-                  </button>
-                ) : null}
-              </div>
-            </>
-          ) : (
-            <>
-              <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                {printer.kind === "usb" ? <UsbIcon /> : <BtIcon />}
-                {printer.name}
-              </span>
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="flex cursor-pointer items-center gap-2 select-none">
-                  <span className="text-xs text-muted">
-                    {t("kitchen_print.auto")}
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={autoPrint}
-                    onChange={(e) => saveAutoPrint(e.target.checked)}
-                    className="peer sr-only"
-                  />
-                  <span className="relative h-5 w-9 rounded-full bg-line transition-colors peer-checked:bg-emerald-500 after:absolute after:left-[2px] after:top-[2px] after:h-[16px] after:w-[16px] after:rounded-full after:bg-white after:shadow-sm after:transition-all after:content-[''] peer-checked:after:translate-x-4" />
-                </label>
-                <button
-                  type="button"
-                  onClick={handleTestPrint}
-                  disabled={printing}
-                  className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs font-medium text-ink transition hover:border-ink/30 disabled:opacity-60"
-                >
-                  {printing ? t("bt.printing") : t("kitchen_print.test")}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDisconnect}
-                  className="rounded-lg px-2 py-1.5 text-xs font-medium text-muted transition hover:bg-canvas hover:text-ink"
-                >
-                  {t("bt.disconnect")}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      ) : null}
+    <div className="space-y-3 rounded-xl border border-line bg-surface px-3 py-3">
+      {/* ── Option A: Direct BT/USB ───────────────────────────────── */}
+      <section className="space-y-2">
+        <header className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-ink">
+            {t("kitchen_print.option_a")}
+          </h3>
+          <p className="text-[11px] text-muted">
+            {t("kitchen_print.option_a.desc")}
+          </p>
+        </header>
 
-      {/* System-print fallback row — always shown. Works with any printer
-          installed at OS level (USB-wired thermal, network, AirPrint).
-          Best paired with Chrome --kiosk-printing for silent auto-print. */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-2.5">
-        <div className="min-w-0 flex-1">
+        {btSupported || usbSupported ? (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {!printer ? (
+              <>
+                <span className="text-xs text-muted">
+                  {t("kitchen_print.not_connected")}
+                </span>
+                <div className="flex gap-1.5">
+                  {btSupported ? (
+                    <button
+                      type="button"
+                      onClick={handleConnectBt}
+                      disabled={connecting !== null}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/30 disabled:opacity-60"
+                    >
+                      <BtIcon />
+                      {connecting === "bt"
+                        ? t("bt.connecting")
+                        : t("kitchen_print.connect_bt")}
+                    </button>
+                  ) : null}
+                  {usbSupported ? (
+                    <button
+                      type="button"
+                      onClick={handleConnectUsb}
+                      disabled={connecting !== null}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink transition hover:border-ink/30 disabled:opacity-60"
+                    >
+                      <UsbIcon />
+                      {connecting === "usb"
+                        ? t("bt.connecting")
+                        : t("kitchen_print.connect_usb")}
+                    </button>
+                  ) : null}
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  {printer.kind === "usb" ? <UsbIcon /> : <BtIcon />}
+                  {printer.name}
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="flex cursor-pointer items-center gap-2 select-none">
+                    <span className="text-xs text-muted">
+                      {t("kitchen_print.auto")}
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={autoPrint}
+                      onChange={(e) => saveAutoPrint(e.target.checked)}
+                      className="peer sr-only"
+                    />
+                    <span className="relative h-5 w-9 rounded-full bg-line transition-colors peer-checked:bg-emerald-500 after:absolute after:left-[2px] after:top-[2px] after:h-[16px] after:w-[16px] after:rounded-full after:bg-white after:shadow-sm after:transition-all after:content-[''] peer-checked:after:translate-x-4" />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleTestPrint}
+                    disabled={printing}
+                    className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs font-medium text-ink transition hover:border-ink/30 disabled:opacity-60"
+                  >
+                    {printing ? t("bt.printing") : t("kitchen_print.test")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDisconnect}
+                    className="rounded-lg px-2 py-1.5 text-xs font-medium text-muted transition hover:bg-canvas hover:text-ink"
+                  >
+                    {t("bt.disconnect")}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <p className="rounded-lg border border-dashed border-line bg-canvas/50 px-3 py-2 text-[11px] text-muted">
+            {t("kitchen_print.unsupported")}
+          </p>
+        )}
+      </section>
+
+      {/* ── Option B: System print (any OS-installed printer) ─────── */}
+      <section className="space-y-2 border-t border-line pt-3">
+        <header className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-ink">
+            {t("kitchen_print.option_b")}
+          </h3>
+          <p className="text-[11px] text-muted">
+            {t("kitchen_print.option_b.desc")}
+          </p>
+        </header>
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <label className="flex cursor-pointer items-center gap-2 select-none">
             <input
               type="checkbox"
@@ -242,20 +264,51 @@ export function KitchenPrinterBar({
               {t("kitchen_print.system")}
             </span>
           </label>
-          <p className="ml-11 mt-0.5 text-[11px] text-muted">
-            {t("kitchen_print.system.hint")}
-          </p>
+          {systemPrint ? (
+            <button
+              type="button"
+              onClick={onTestSystemPrint}
+              className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs font-medium text-ink transition hover:border-ink/30"
+            >
+              {t("kitchen_print.test")}
+            </button>
+          ) : null}
         </div>
+
         {systemPrint ? (
-          <button
-            type="button"
-            onClick={onTestSystemPrint}
-            className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs font-medium text-ink transition hover:border-ink/30"
-          >
-            {t("kitchen_print.test")}
-          </button>
+          <details className="group rounded-lg border border-line bg-canvas/50">
+            <summary className="cursor-pointer list-none px-3 py-2 text-[11px] font-medium text-ink select-none">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="transition-transform group-open:rotate-90">›</span>
+                {t("kitchen_print.kiosk.title")}
+              </span>
+            </summary>
+            <div className="space-y-2 border-t border-line px-3 py-2.5 text-[11px] text-muted">
+              <p>{t("kitchen_print.kiosk.intro")}</p>
+
+              <div>
+                <p className="mb-1 font-medium text-ink">
+                  {t("kitchen_print.kiosk.windows")}
+                </p>
+                <pre className="overflow-x-auto rounded bg-ink/95 px-2.5 py-2 text-[10px] leading-relaxed text-surface">
+{`"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --kiosk-printing https://qr-menu-eta-seven.vercel.app/dashboard/kitchen`}
+                </pre>
+              </div>
+
+              <div>
+                <p className="mb-1 font-medium text-ink">
+                  {t("kitchen_print.kiosk.mac")}
+                </p>
+                <pre className="overflow-x-auto rounded bg-ink/95 px-2.5 py-2 text-[10px] leading-relaxed text-surface">
+{`open -a "Google Chrome" --args --kiosk-printing https://qr-menu-eta-seven.vercel.app/dashboard/kitchen`}
+                </pre>
+              </div>
+
+              <p className="italic">{t("kitchen_print.kiosk.tip")}</p>
+            </div>
+          </details>
         ) : null}
-      </div>
+      </section>
     </div>
   );
 }
