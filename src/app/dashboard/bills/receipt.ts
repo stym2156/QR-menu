@@ -66,41 +66,16 @@ export function printReceipt(input: PrintReceiptInput): void {
     if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
   };
 
-  iframe.onload = (): void => {
-    const win = iframe.contentWindow;
-    if (!win) {
-      cleanup();
-      return;
-    }
-    const doPrint = (): void => {
-      try {
-        win.focus();
-        win.print();
-      } finally {
-        // Some browsers fire onafterprint, others don't — clean up either way.
-        setTimeout(cleanup, 1000);
-      }
-    };
-    // Wait for fonts AND images (QR code) before printing — prevents blank output.
-    const fonts = (win.document as Document & { fonts?: { ready: Promise<unknown> } }).fonts;
-    const fontsReady = fonts?.ready ?? Promise.resolve();
-    const imgs = Array.from(win.document.images);
-    const imagesReady = Promise.all(
-      imgs.map((img) =>
-        img.complete
-          ? Promise.resolve()
-          : new Promise<void>((resolve) => {
-              img.onload = () => resolve();
-              img.onerror = () => resolve();
-            }),
-      ),
-    );
-    Promise.all([fontsReady, imagesReady]).then(doPrint).catch(doPrint);
-  };
-
+  // DON'T use iframe.onload here — appendChild fires onload for the empty
+  // about:blank document BEFORE doc.write() injects our HTML. At that point
+  // document.images is empty, so the "wait for images" promise resolves
+  // immediately and print() runs before the QR image has loaded.
+  // (Second clicks "worked" only because the image was already in browser
+  // cache.) Instead, write HTML first, then wait for images directly.
   document.body.appendChild(iframe);
   const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
-  if (!doc) {
+  const win = iframe.contentWindow;
+  if (!doc || !win) {
     cleanup();
     alert("ไม่สามารถสร้างใบเสร็จได้ — กรุณาลองใหม่");
     return;
@@ -108,6 +83,35 @@ export function printReceipt(input: PrintReceiptInput): void {
   doc.open();
   doc.write(html);
   doc.close();
+
+  const doPrint = (): void => {
+    try {
+      win.focus();
+      win.print();
+    } finally {
+      // Some browsers fire onafterprint, others don't — clean up either way.
+      setTimeout(cleanup, 1000);
+    }
+  };
+
+  // After doc.close() the document is fully parsed and image elements exist
+  // in the DOM (though their bytes may still be downloading). Treat complete
+  // + naturalWidth>0 as truly loaded (some browsers report complete=true
+  // momentarily before the image actually decodes).
+  const fonts = (win.document as Document & { fonts?: { ready: Promise<unknown> } }).fonts;
+  const fontsReady = fonts?.ready ?? Promise.resolve();
+  const imgs = Array.from(win.document.images);
+  const imagesReady = Promise.all(
+    imgs.map((img) =>
+      img.complete && img.naturalWidth > 0
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => {
+            img.addEventListener("load", () => resolve(), { once: true });
+            img.addEventListener("error", () => resolve(), { once: true });
+          }),
+    ),
+  );
+  Promise.all([fontsReady, imagesReady]).then(doPrint).catch(doPrint);
 }
 
 interface RenderInput extends PrintReceiptInput {
