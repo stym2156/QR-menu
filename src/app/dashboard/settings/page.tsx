@@ -13,6 +13,7 @@ interface StaffMember {
   user_id: string;
   role: "owner" | "staff" | "cook" | "waiter";
   invited_email: string | null;
+  phone: string | null;
   created_at: string;
 }
 

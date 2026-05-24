@@ -21,6 +21,7 @@ export default function JoinForm({ token, restaurantName, role }: Props) {
   const [mode, setMode] = useState<"signup" | "login">("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -37,7 +38,10 @@ export default function JoinForm({ token, restaurantName, role }: Props) {
       options: {
         // The trigger reads this and attaches the new user to the invite's
         // restaurant + role instead of creating a new restaurant.
-        data: { invite_token: token },
+        data: {
+          invite_token: token,
+          phone: phone.trim() || null,
+        },
       },
     });
 
@@ -160,6 +164,21 @@ export default function JoinForm({ token, restaurantName, role }: Props) {
             autoComplete="email"
           />
         </FormField>
+
+        {mode === "signup" ? (
+          <FormField label={t("auth.field.phone")} hint={t("common.optional")}>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              autoComplete="tel"
+              name="phone"
+              inputMode="tel"
+              className={input}
+              placeholder={t("auth.field.phone.placeholder")}
+            />
+          </FormField>
+        ) : null}
 
         <FormField
           label={t("auth.field.password")}

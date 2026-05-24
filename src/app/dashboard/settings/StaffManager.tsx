@@ -20,6 +20,7 @@ interface Member {
   user_id: string;
   role: "owner" | "staff" | "cook" | "waiter";
   invited_email: string | null;
+  phone: string | null;
   created_at: string;
 }
 
@@ -285,6 +286,17 @@ export default function StaffManager({
                   <div className="text-[11px] text-muted">
                     {t("staff.added_at", { time: formatDateTime(m.created_at) })}
                   </div>
+                  {m.phone ? (
+                    <div className="mt-0.5 text-[11px] text-muted">
+                      📞{" "}
+                      <a
+                        href={`tel:${m.phone}`}
+                        className="text-ink hover:text-accent-600"
+                      >
+                        {m.phone}
+                      </a>
+                    </div>
+                  ) : null}
                 </div>
                 {m.role !== "owner" && m.user_id !== currentUserId ? (
                   <button

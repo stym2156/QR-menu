@@ -22,6 +22,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [restaurantName, setRestaurantName] = useState("");
+  const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -36,7 +37,10 @@ export default function SignupPage() {
       email,
       password,
       options: {
-        data: { restaurant_name: restaurantName },
+        data: {
+          restaurant_name: restaurantName,
+          phone: phone.trim() || null,
+        },
       },
     });
 
@@ -105,6 +109,19 @@ export default function SignupPage() {
               name="email"
               className={input}
               placeholder={t("auth.field.email.placeholder")}
+            />
+          </FormField>
+
+          <FormField label={t("auth.field.phone")} hint={t("common.optional")}>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              autoComplete="tel"
+              name="phone"
+              inputMode="tel"
+              className={input}
+              placeholder={t("auth.field.phone.placeholder")}
             />
           </FormField>
 
