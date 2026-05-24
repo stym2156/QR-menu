@@ -333,6 +333,8 @@ export default function CustomerOrder({
 
       {showBill && (
         <BillModal
+          restaurantId={restaurantId}
+          tableId={tableId}
           tableNumber={tableNumber}
           menus={menus}
           orders={activeOrders}

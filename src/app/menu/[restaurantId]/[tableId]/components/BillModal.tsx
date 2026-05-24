@@ -1,15 +1,18 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { formatKIP, formatTime } from "@/lib/format";
 import { calculateBill } from "@/lib/bill";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { pickName } from "@/lib/i18n/localized";
 import type { Menu, Order } from "@/lib/types";
+import { callStaff } from "../actions";
 import { Sheet } from "./Sheet";
 import { OrderStatusBadge } from "./OrderStatusBadge";
 
 interface BillModalProps {
+  restaurantId: string;
+  tableId: string;
   tableNumber: number;
   menus: Menu[];
   orders: Order[];
@@ -19,6 +22,8 @@ interface BillModalProps {
 }
 
 export function BillModal({
+  restaurantId,
+  tableId,
   tableNumber,
   menus,
   orders,
@@ -28,6 +33,26 @@ export function BillModal({
 }: BillModalProps) {
   const { t, locale } = useT();
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
+  const [billCallState, setBillCallState] = useState<
+    "idle" | "sending" | "sent" | "error"
+  >("idle");
+  const [billCallError, setBillCallError] = useState<string | null>(null);
+
+  async function requestBill(): Promise<void> {
+    setBillCallState("sending");
+    setBillCallError(null);
+    const result = await callStaff({
+      restaurantId,
+      tableId,
+      reason: t("cust.call.preset.bill"),
+    });
+    if (!result.ok) {
+      setBillCallError(result.error);
+      setBillCallState("error");
+      return;
+    }
+    setBillCallState("sent");
+  }
 
   // Cancelled orders don't count toward the bill total but are still shown
   // in the list so the customer can see what was cancelled and why.
@@ -129,8 +154,33 @@ export function BillModal({
                 {formatKIP(bill.grandTotal)}
               </span>
             </div>
-            <p className="mt-2 text-xs text-muted">
-              {t("cust.bill.pay_hint")}
+            <button
+              type="button"
+              onClick={requestBill}
+              disabled={billCallState === "sending" || billCallState === "sent"}
+              className={`mt-4 flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-medium transition active:scale-[0.98] disabled:active:scale-100 ${
+                billCallState === "sent"
+                  ? "bg-emerald-600 text-surface"
+                  : "bg-ink text-surface shadow-ink hover:bg-ink/85 disabled:opacity-70"
+              }`}
+            >
+              {billCallState === "sent" ? (
+                <>✓ {t("cust.bill.request_sent")}</>
+              ) : billCallState === "sending" ? (
+                t("cust.bill.requesting")
+              ) : (
+                <>🧾 {t("cust.bill.request_bill")}</>
+              )}
+            </button>
+            {billCallError ? (
+              <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                {billCallError}
+              </p>
+            ) : null}
+            <p className="mt-2 text-center text-[11px] text-muted">
+              {billCallState === "sent"
+                ? t("cust.bill.request_sent_hint")
+                : t("cust.bill.pay_hint")}
             </p>
           </div>
         </>

@@ -52,6 +52,7 @@ export default function MenuManager({
   const [error, setError] = useState<string | null>(null);
   const [catEditingId, setCatEditingId] = useState<string | null>(null);
   const [nameEditingId, setNameEditingId] = useState<string | null>(null);
+  const [addCatPickerOpen, setAddCatPickerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const categoryMap = useMemo(
@@ -342,12 +343,23 @@ export default function MenuManager({
           </FormField>
 
           <FormField label={t("mgr.menu.category")}>
-            <CategoryCombobox
-              value={categoryId}
-              onChange={setCategoryId}
-              categories={categories}
-              onCreate={createCategoryInline}
-            />
+            <button
+              type="button"
+              onClick={() => setAddCatPickerOpen(true)}
+              className={`${input} flex items-center justify-between text-left`}
+            >
+              <span className={categoryId ? "text-ink" : "text-muted"}>
+                {categoryId
+                  ? (() => {
+                      const c = categoryMap.get(categoryId);
+                      return c ? pickName(c, locale) : t("combobox.none");
+                    })()
+                  : t("combobox.placeholder")}
+              </span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 shrink-0 opacity-60">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
           </FormField>
 
           <FormField label={t("mgr.menu.image")}>
@@ -648,6 +660,25 @@ export default function MenuManager({
             );
           })()
         : null}
+
+      {addCatPickerOpen ? (
+        <CategoryPickerModal
+          title={t("mgr.menu.category")}
+          currentId={categoryId}
+          categories={categories}
+          locale={locale}
+          noneLabel={t("combobox.none")}
+          closeLabel={t("common.close")}
+          onSelect={(id) => {
+            setCategoryId(id);
+            setAddCatPickerOpen(false);
+          }}
+          onClose={() => setAddCatPickerOpen(false)}
+          onCreate={createCategoryInline}
+          createPlaceholder={t("combobox.placeholder_search")}
+          createButtonLabel={t("common.add")}
+        />
+      ) : null}
     </div>
   );
 }
@@ -888,6 +919,11 @@ interface CategoryPickerModalProps {
   closeLabel: string;
   onSelect: (id: string | null) => void;
   onClose: () => void;
+  // Optional: enable inline "create new category" input at the top of the
+  // modal. When provided, a successful create auto-selects the new row.
+  onCreate?: (name: string) => Promise<Category | null>;
+  createPlaceholder?: string;
+  createButtonLabel?: string;
 }
 
 function CategoryPickerModal({
@@ -899,7 +935,13 @@ function CategoryPickerModal({
   closeLabel,
   onSelect,
   onClose,
+  onCreate,
+  createPlaceholder,
+  createButtonLabel,
 }: CategoryPickerModalProps) {
+  const [createName, setCreateName] = useState("");
+  const [creating, setCreating] = useState(false);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
       if (e.key === "Escape") onClose();
@@ -907,6 +949,19 @@ function CategoryPickerModal({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  async function handleCreate(): Promise<void> {
+    const trimmed = createName.trim();
+    if (!trimmed || !onCreate || creating) return;
+    setCreating(true);
+    const created = await onCreate(trimmed);
+    setCreating(false);
+    if (created) {
+      setCreateName("");
+      onSelect(created.id);
+    }
+  }
+
   return (
     <div
       onClick={onClose}
@@ -932,6 +987,36 @@ function CategoryPickerModal({
             </svg>
           </button>
         </div>
+
+        {onCreate ? (
+          <div className="border-b border-line bg-canvas/30 px-3 py-2.5">
+            <div className="flex gap-1.5">
+              <input
+                type="text"
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleCreate();
+                  }
+                }}
+                placeholder={createPlaceholder ?? ""}
+                className="flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink outline-none transition focus:border-ink/30"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => void handleCreate()}
+                disabled={!createName.trim() || creating}
+                className="shrink-0 rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-surface transition hover:bg-ink/85 disabled:opacity-50"
+              >
+                {createButtonLabel ?? "+"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <ul className="max-h-[60vh] overflow-y-auto py-1">
           <li>
             <PickerRow
