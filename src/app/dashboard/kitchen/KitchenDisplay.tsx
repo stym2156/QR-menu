@@ -12,6 +12,7 @@ import { CancelOrderDialog } from "./CancelOrderDialog";
 import { KitchenPrinterBar } from "./KitchenPrinterBar";
 import { buildKitchenTicketBytes } from "@/lib/escposKitchenTicket";
 import { getActivePrinter, printToActivePrinter } from "@/lib/printer";
+import { printKitchenTicketSystem } from "@/lib/printKitchenTicketSystem";
 import type { DiningTable, Menu, Order } from "@/lib/types";
 import type { Locale } from "@/lib/i18n/types";
 
@@ -47,38 +48,61 @@ export default function KitchenDisplay({
   const [tab, setTab] = useState<KitchenTab>("active");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [autoPrintEnabled, setAutoPrintEnabled] = useState(false);
+  const [systemPrintEnabled, setSystemPrintEnabled] = useState(false);
   const autoPrintRef = useRef(false);
+  const systemPrintRef = useRef(false);
 
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
   const tableMap = useMemo(() => new Map(tables.map((t) => [t.id, t])), [tables]);
 
-  // Keep ref in sync — the realtime callback below captures it at subscribe
-  // time, so we use a ref to read the latest value.
+  // Keep refs in sync — the realtime callback below captures them at subscribe
+  // time, so we use refs to read the latest values.
   useEffect(() => {
     autoPrintRef.current = autoPrintEnabled;
   }, [autoPrintEnabled]);
 
+  useEffect(() => {
+    systemPrintRef.current = systemPrintEnabled;
+  }, [systemPrintEnabled]);
+
   const handleNewOrder = useCallback(
     async (order: Order) => {
-      if (!autoPrintRef.current) return;
-      if (!getActivePrinter()) return;
       const table = tableMap.get(order.table_id);
-      const bytes = buildKitchenTicketBytes({
-        order,
-        menus,
-        tableNumber: table?.table_number ?? 0,
-        widthMm: kitchenPrintWidth,
-        locale: locale as Locale,
-      });
-      const result = await printToActivePrinter(bytes);
-      if (!result.ok) {
-        toast.error(t("kitchen_print.auto_failed", { error: result.error }));
-        setAutoPrintEnabled(false);
-        try {
-          localStorage.setItem("qrmenu.kitchen.autoPrint", "false");
-        } catch {
-          /* noop */
+      const tableNumber = table?.table_number ?? 0;
+      const hasDirect = getActivePrinter() !== null;
+
+      // Path 1: direct BT/USB printer wins when available + auto-print toggle on.
+      if (autoPrintRef.current && hasDirect) {
+        const bytes = buildKitchenTicketBytes({
+          order,
+          menus,
+          tableNumber,
+          widthMm: kitchenPrintWidth,
+          locale: locale as Locale,
+        });
+        const result = await printToActivePrinter(bytes);
+        if (!result.ok) {
+          toast.error(t("kitchen_print.auto_failed", { error: result.error }));
+          setAutoPrintEnabled(false);
+          try {
+            localStorage.setItem("qrmenu.kitchen.autoPrint", "false");
+          } catch {
+            /* noop */
+          }
         }
+        return;
+      }
+
+      // Path 2: no direct printer — fall back to OS print pipeline if owner
+      // enabled it. Best paired with Chrome --kiosk-printing for silent print.
+      if (systemPrintRef.current && !hasDirect) {
+        printKitchenTicketSystem({
+          order,
+          menus,
+          tableNumber,
+          widthMm: kitchenPrintWidth,
+          locale: locale as Locale,
+        });
       }
     },
     [tableMap, menus, kitchenPrintWidth, locale, toast, t],
@@ -93,27 +117,46 @@ export default function KitchenDisplay({
   });
 
   async function reprintOrder(order: Order): Promise<void> {
-    if (!getActivePrinter()) {
-      toast.error(t("kitchen_print.not_connected"));
+    const table = tableMap.get(order.table_id);
+    const tableNumber = table?.table_number ?? 0;
+    const hasDirect = getActivePrinter() !== null;
+
+    // Prefer the direct BT/USB printer when connected.
+    if (hasDirect) {
+      setBusyId(order.id);
+      const bytes = buildKitchenTicketBytes({
+        order,
+        menus,
+        tableNumber,
+        widthMm: kitchenPrintWidth,
+        locale: locale as Locale,
+        badge: t("kitchen_print.reprint"),
+      });
+      const result = await printToActivePrinter(bytes);
+      setBusyId(null);
+      if (result.ok) {
+        toast.success(t("kitchen_print.reprint_done"));
+      } else {
+        toast.error(t("bt.print_failed", { error: result.error }));
+      }
       return;
     }
-    setBusyId(order.id);
-    const table = tableMap.get(order.table_id);
-    const bytes = buildKitchenTicketBytes({
-      order,
-      menus,
-      tableNumber: table?.table_number ?? 0,
-      widthMm: kitchenPrintWidth,
-      locale: locale as Locale,
-      badge: t("kitchen_print.reprint"),
-    });
-    const result = await printToActivePrinter(bytes);
-    setBusyId(null);
-    if (result.ok) {
-      toast.success(t("kitchen_print.reprint_done"));
-    } else {
-      toast.error(t("bt.print_failed", { error: result.error }));
+
+    // Fall back to system print when enabled — this is how cooks with a
+    // plain wired/Wi-Fi printer can still reprint a ticket.
+    if (systemPrintRef.current) {
+      printKitchenTicketSystem({
+        order,
+        menus,
+        tableNumber,
+        widthMm: kitchenPrintWidth,
+        locale: locale as Locale,
+        badge: t("kitchen_print.reprint"),
+      });
+      return;
     }
+
+    toast.error(t("kitchen_print.not_connected"));
   }
 
   function buildTestBytes(): Uint8Array {
@@ -143,6 +186,53 @@ export default function KitchenDisplay({
       created_at: new Date().toISOString(),
     };
     return buildKitchenTicketBytes({
+      order: sample,
+      menus: [
+        {
+          id: "test",
+          restaurant_id: restaurantId,
+          category_id: null,
+          name: "TEST PRINT",
+          name_lo: null,
+          name_en: null,
+          price: 0,
+          image_url: null,
+          available: true,
+          created_at: new Date().toISOString(),
+        },
+      ],
+      tableNumber: 0,
+      widthMm: kitchenPrintWidth,
+      locale: locale as Locale,
+      badge: t("kitchen_print.test"),
+    });
+  }
+
+  function runSystemTestPrint(): void {
+    const sample: Order = {
+      id: "test-0000",
+      table_id: "",
+      restaurant_id: restaurantId,
+      items: [
+        {
+          menu_id: "test",
+          qty: 1,
+          note: t("kitchen_print.test_sent"),
+        },
+      ],
+      status: "pending",
+      total: 0,
+      paid: false,
+      paid_at: null,
+      payment_method: null,
+      cancel_reason: null,
+      accepted_at: null,
+      accepted_by: null,
+      completed_at: null,
+      completed_by: null,
+      created_at: new Date().toISOString(),
+    };
+    printKitchenTicketSystem({
       order: sample,
       menus: [
         {
@@ -235,7 +325,9 @@ export default function KitchenDisplay({
       {canAct ? (
         <KitchenPrinterBar
           onAutoPrintChange={setAutoPrintEnabled}
+          onSystemPrintChange={setSystemPrintEnabled}
           onTestPrint={buildTestBytes}
+          onTestSystemPrint={runSystemTestPrint}
         />
       ) : null}
 
