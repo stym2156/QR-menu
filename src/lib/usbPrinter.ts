@@ -112,26 +112,29 @@ function emitChange(): void {
   for (const cb of listeners) cb();
 }
 
-// Try to find an OUT bulk endpoint on an opened device. Returns
-// interface + endpoint numbers, or null if we can't find one.
-function findWriteEndpoint(
+// Collect every (interface, out-bulk-endpoint) pair on the device. Some
+// printers expose multiple interfaces — if the OS driver has grabbed the
+// first one we want to try the rest before giving up.
+function findWriteCandidates(
   device: USBDevice,
-): { interfaceNumber: number; endpointNumber: number } | null {
+): Array<{ interfaceNumber: number; endpointNumber: number }> {
+  const out: Array<{ interfaceNumber: number; endpointNumber: number }> = [];
   for (const cfg of device.configurations) {
     for (const iface of cfg.interfaces) {
       for (const alt of iface.alternates) {
         for (const ep of alt.endpoints) {
           if (ep.direction === "out" && ep.type === "bulk") {
-            return {
+            out.push({
               interfaceNumber: iface.interfaceNumber,
               endpointNumber: ep.endpointNumber,
-            };
+            });
+            break; // one endpoint per interface is enough
           }
         }
       }
     }
   }
-  return null;
+  return out;
 }
 
 async function setupDevice(
@@ -145,8 +148,8 @@ async function setupDevice(
     if (device.configuration === null) {
       await device.selectConfiguration(1);
     }
-    const ep = findWriteEndpoint(device);
-    if (!ep) {
+    const candidates = findWriteCandidates(device);
+    if (candidates.length === 0) {
       try {
         await device.close();
       } catch {
@@ -155,18 +158,46 @@ async function setupDevice(
       return {
         ok: false,
         error:
-          "หา endpoint สำหรับเขียนข้อมูลไม่เจอ — อาจไม่ใช่ printer หรือยังถือ driver อยู่",
+          "หา endpoint สำหรับเขียนข้อมูลไม่เจอ — อาจไม่ใช่ printer",
       };
     }
-    await device.claimInterface(ep.interfaceNumber);
-    return {
-      ok: true,
-      printer: {
-        device,
-        interfaceNumber: ep.interfaceNumber,
-        endpointNumber: ep.endpointNumber,
-      },
-    };
+
+    // Try each interface in turn. Most printers have only one but cheap
+    // POS units sometimes register a CDC + printer pair, and the OS holds
+    // the first; the second is still free.
+    let lastError: unknown = null;
+    for (const cand of candidates) {
+      try {
+        await device.claimInterface(cand.interfaceNumber);
+        return {
+          ok: true,
+          printer: {
+            device,
+            interfaceNumber: cand.interfaceNumber,
+            endpointNumber: cand.endpointNumber,
+          },
+        };
+      } catch (err) {
+        lastError = err;
+        // keep trying other interfaces
+      }
+    }
+
+    // All candidates rejected — typically OS driver is holding the device.
+    try {
+      await device.close();
+    } catch {
+      /* noop */
+    }
+    const message = lastError instanceof Error ? lastError.message : String(lastError);
+    if (message.toLowerCase().includes("claim")) {
+      return {
+        ok: false,
+        error:
+          "เครื่องนี้ถูก OS driver ยึดอยู่ (Windows/Mac มักโหลด driver อัตโนมัติ) — ลอง: 1) ถอด/เสียบ USB ใหม่ก่อนเปิดหน้านี้ 2) ปิดโปรแกรม print queue ของ OS 3) ใช้ Bluetooth แทน",
+      };
+    }
+    return { ok: false, error: message };
   } catch (err) {
     return {
       ok: false,
