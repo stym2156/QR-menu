@@ -1,15 +1,28 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Sarabun } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/toast";
 import { ConfirmProvider } from "@/components/ConfirmDialog";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 
+// Latin UI — clean, neutral.
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
   display: "swap",
 });
+
+// Thai — Sarabun is the de-facto modern Thai UI font.
+const sarabun = Sarabun({
+  subsets: ["thai", "latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-thai",
+  display: "swap",
+});
+
+// Lao — Phetsarath OT is loaded via @font-face in globals.css (file lives
+// in /public/fonts). Variable here is just so Tailwind's font chain can
+// reference it; the @font-face declaration defines the actual family.
 
 export const metadata: Metadata = {
   title: "QR Menu— QR Ordering",
@@ -39,7 +52,10 @@ export const viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="th" className={inter.variable}>
+    <html
+      lang="th"
+      className={`${inter.variable} ${sarabun.variable}`}
+    >
       <body
         className="min-h-screen bg-canvas font-sans text-ink antialiased"
         suppressHydrationWarning
