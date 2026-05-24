@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import QRCode from "qrcode";
+import { qrWithLabel } from "@/lib/qrWithLabel";
 import { createClient } from "@/lib/supabase/client";
 import {
   EmptyState,
@@ -104,7 +104,11 @@ export default function TableManager({
 
   async function downloadQR(table: DiningTable): Promise<void> {
     const url = `${origin}/menu/${restaurantId}/${table.id}`;
-    const dataUrl = await QRCode.toDataURL(url, { width: 600, margin: 2 });
+    const dataUrl = await qrWithLabel({
+      url,
+      label: String(table.table_number),
+      size: 600,
+    });
     const link = document.createElement("a");
     link.href = dataUrl;
     link.download = `table-${table.table_number}.png`;
@@ -278,13 +282,18 @@ function TableCard({
   useEffect(() => {
     if (!url) return;
     let cancelled = false;
-    void QRCode.toDataURL(url, { width: 240, margin: 1 }).then((src) => {
+    void qrWithLabel({
+      url,
+      label: String(table.table_number),
+      size: 240,
+      margin: 1,
+    }).then((src) => {
       if (!cancelled) setQrSrc(src);
     });
     return () => {
       cancelled = true;
     };
-  }, [url]);
+  }, [url, table.table_number]);
 
   return (
     <div
