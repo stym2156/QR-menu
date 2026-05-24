@@ -161,11 +161,25 @@ function renderHTML(input: RenderInput): string {
 <meta charset="utf-8" />
 <title>${escape(t("receipt.title_table", { n: input.tableNumber }))}</title>
 <style>
-  @page { size: 58mm auto; margin: 4mm; }
+  /* Let the browser/user pick paper size in the print dialog. The layout
+     below adapts: tight thermal-style under ~100mm, full-page A4 style
+     above. Removing the @page size hint avoids the bug where selecting
+     A3/Letter on mobile crammed a 58mm-wide layout into the top-left
+     corner of a big sheet. */
+  @page { margin: 6mm; }
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Sarabun", sans-serif; margin: 0; padding: 8px; color: #000; }
+
+  /* ============ Base = compact (good for thermal 58/80mm) ============ */
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Sarabun", sans-serif;
+    margin: 0;
+    padding: 0;
+    color: #000;
+    font-size: 11px;
+    line-height: 1.35;
+  }
   .center { text-align: center; }
-  h1 { font-size: 14px; margin: 0 0 4px; }
+  h1 { font-size: 14px; margin: 0 0 4px; font-weight: 700; }
   .meta { font-size: 10px; color: #444; line-height: 1.4; }
   hr { border: 0; border-top: 1px dashed #000; margin: 8px 0; }
   table { width: 100%; border-collapse: collapse; font-size: 11px; }
@@ -181,6 +195,82 @@ function renderHTML(input: RenderInput): string {
   .qr-section img { width: 140px; height: 140px; object-fit: contain; display: block; margin: 0 auto; }
   .qr-label { font-size: 10px; font-weight: 600; margin-bottom: 4px; }
   .footer { font-size: 9px; color: #666; text-align: center; margin-top: 10px; }
+
+  /* ============ Wider paper = full-page A4 layout ============
+     Triggers at A4 / Letter / A3 etc. (anything wider than 100mm).
+     Thermal 58/80mm paper falls below the threshold and keeps the
+     compact base style above. */
+  @media print and (min-width: 100mm) {
+    @page { margin: 12mm; }
+    body {
+      max-width: 180mm;
+      margin: 0 auto;
+      font-size: 13pt;
+      line-height: 1.5;
+    }
+    h1 {
+      font-size: 26pt;
+      margin: 0 0 8pt;
+      letter-spacing: -0.01em;
+    }
+    .meta {
+      font-size: 11pt;
+      line-height: 1.6;
+    }
+    hr {
+      border-top: 1px solid #000;
+      margin: 16pt 0;
+    }
+    table {
+      font-size: 13pt;
+    }
+    th, td {
+      padding: 6pt 0;
+    }
+    th {
+      font-size: 9pt;
+      padding-bottom: 8pt;
+      border-bottom: 1px solid #ccc;
+    }
+    .qty {
+      width: 50pt;
+    }
+    .total {
+      width: 110pt;
+    }
+    .unit {
+      font-size: 10pt;
+      margin-top: 2pt;
+    }
+    .note {
+      font-size: 10pt;
+      padding-left: 10pt;
+    }
+    .grand {
+      font-size: 20pt;
+      padding-top: 8pt;
+    }
+    .summary {
+      font-size: 11pt;
+      margin: 12pt 0;
+    }
+    .qr-section {
+      margin-top: 24pt;
+    }
+    .qr-section img {
+      width: 50mm;
+      height: 50mm;
+    }
+    .qr-label {
+      font-size: 12pt;
+      margin-bottom: 8pt;
+    }
+    .footer {
+      font-size: 11pt;
+      margin-top: 20pt;
+    }
+  }
+
   @media print {
     body { padding: 0; }
     .no-print { display: none; }
