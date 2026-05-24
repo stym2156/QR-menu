@@ -11,6 +11,7 @@ export type Restaurant = {
   service_charge_pct: number;
   vat_pct: number;
   payment_qr_url: string | null;
+  kitchen_print_width: number;
   created_at: string;
 };
 

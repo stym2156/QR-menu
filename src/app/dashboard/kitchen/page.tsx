@@ -32,6 +32,7 @@ export default async function KitchenPage() {
     { data: menus },
     { data: tables },
     { data: members },
+    { data: restaurantRow },
   ] = await Promise.all([
     supabase
       .from("orders")
@@ -50,6 +51,11 @@ export default async function KitchenPage() {
     supabase.from("menus").select("*").eq("restaurant_id", restaurant.id),
     supabase.from("tables").select("*").eq("restaurant_id", restaurant.id),
     supabase.rpc("lookup_member_emails", { rid: restaurant.id }),
+    supabase
+      .from("restaurants")
+      .select("name, kitchen_print_width")
+      .eq("id", restaurant.id)
+      .maybeSingle(),
   ]);
 
   const memberEmails: Record<string, string> = {};
@@ -68,6 +74,10 @@ export default async function KitchenPage() {
         tables={(tables ?? []) as DiningTable[]}
         memberEmails={memberEmails}
         canAct={canActKitchen(membership.role)}
+        kitchenPrintWidth={
+          (restaurantRow as { kitchen_print_width?: number } | null)
+            ?.kitchen_print_width ?? 58
+        }
       />
     </div>
   );

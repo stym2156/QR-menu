@@ -950,6 +950,25 @@ end;
 $$;
 
 -- ============================================================
+-- 0018: Kitchen ticket print width per restaurant
+-- ============================================================
+
+alter table public.restaurants
+  add column if not exists kitchen_print_width int not null default 58;
+
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.table_constraints
+    where constraint_name = 'restaurants_kitchen_print_width_range'
+  ) then
+    alter table public.restaurants
+      add constraint restaurants_kitchen_print_width_range
+      check (kitchen_print_width in (58, 76, 80));
+  end if;
+end $$;
+
+-- ============================================================
 -- Reload PostgREST schema cache so new columns are immediately visible
 -- ============================================================
 notify pgrst, 'reload schema';

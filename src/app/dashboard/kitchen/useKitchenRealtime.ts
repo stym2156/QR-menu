@@ -9,6 +9,9 @@ interface UseKitchenRealtimeOptions {
   restaurantId: string;
   setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
   setHistory: React.Dispatch<React.SetStateAction<Order[]>>;
+  // Fires for every newly-inserted order (not initial load). Used by the
+  // auto-print pipeline; safe to omit for read-only consumers.
+  onNewOrder?: (order: Order) => void | Promise<void>;
 }
 
 /**
@@ -23,6 +26,7 @@ export function useKitchenRealtime({
   restaurantId,
   setOrders,
   setHistory,
+  onNewOrder,
 }: UseKitchenRealtimeOptions): void {
   useEffect(() => {
     const channel = supabase
@@ -39,6 +43,7 @@ export function useKitchenRealtime({
           const next = payload.new as Order;
           if (next.status === "pending" || next.status === "ready") {
             setOrders((prev) => [...prev, next]);
+            if (onNewOrder) void onNewOrder(next);
           }
         },
       )
@@ -90,5 +95,5 @@ export function useKitchenRealtime({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [supabase, restaurantId, setOrders, setHistory]);
+  }, [supabase, restaurantId, setOrders, setHistory, onNewOrder]);
 }

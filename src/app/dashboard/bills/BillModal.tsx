@@ -48,13 +48,10 @@ export function BillModal({
   const [busy, setBusy] = useState(false);
   const bill = calculateBill(group.total, serviceChargePct, vatPct);
 
-  // Block settle until the kitchen has marked every (non-cancelled) order
-  // as served. Cancelled orders are excluded from the count because they
-  // don't need to be served.
-  const pendingServeCount = group.orders.filter(
-    (o) => o.status !== "served" && o.status !== "cancelled",
-  ).length;
-  const canSettle = canAct && pendingServeCount === 0;
+  // Kitchen-ticket workflow means the cook works off the printed ticket,
+  // not the dashboard — waiters can settle whenever the customer is ready
+  // to pay regardless of whether anyone clicked "served" in the kitchen UI.
+  const canSettle = canAct;
 
   async function handleSettle(): Promise<void> {
     setBusy(true);
@@ -176,10 +173,6 @@ export function BillModal({
           {!canAct ? (
             <p className="mt-4 rounded-xl border border-line bg-canvas/50 px-3 py-2 text-xs text-muted">
               {t("bill.modal.read_only")}
-            </p>
-          ) : pendingServeCount > 0 ? (
-            <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              {t("bill.modal.cant_settle_yet", { n: pendingServeCount })}
             </p>
           ) : null}
 

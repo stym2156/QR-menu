@@ -39,6 +39,9 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
     String(restaurant.service_charge_pct ?? 0),
   );
   const [vatPct, setVatPct] = useState(String(restaurant.vat_pct ?? 0));
+  const [kitchenPrintWidth, setKitchenPrintWidth] = useState(
+    String(restaurant.kitchen_print_width ?? 58),
+  );
   const [savingShop, setSavingShop] = useState(false);
 
   const [paymentQrUrl, setPaymentQrUrl] = useState<string | null>(
@@ -116,6 +119,12 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
       toast.error(t("set.shop.error.vat"));
       return;
     }
+    const widthNum = Number(kitchenPrintWidth);
+    const allowedWidths = [58, 76, 80];
+    if (!allowedWidths.includes(widthNum)) {
+      toast.error(t("set.shop.error.kitchen_width"));
+      return;
+    }
     setSavingShop(true);
     const { error } = await supabase
       .from("restaurants")
@@ -126,6 +135,7 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
         close_time: closeTime || null,
         service_charge_pct: service,
         vat_pct: vat,
+        kitchen_print_width: widthNum,
       })
       .eq("id", restaurant.id);
     setSavingShop(false);
@@ -270,6 +280,21 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
             </FormField>
           </div>
         </div>
+
+        <FormField
+          label={t("set.shop.kitchen_print_width")}
+          hint={t("set.shop.kitchen_print_width.hint")}
+        >
+          <select
+            value={kitchenPrintWidth}
+            onChange={(e) => setKitchenPrintWidth(e.target.value)}
+            className={`${input} appearance-none`}
+          >
+            <option value="58">58 mm — {t("set.shop.kitchen_width.58")}</option>
+            <option value="76">76 mm — {t("set.shop.kitchen_width.76")}</option>
+            <option value="80">80 mm — {t("set.shop.kitchen_width.80")}</option>
+          </select>
+        </FormField>
 
         <button
           type="submit"
