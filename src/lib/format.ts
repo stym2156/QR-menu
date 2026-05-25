@@ -19,7 +19,9 @@ export function formatTime(iso: string): string {
 }
 
 export function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("th-TH", {
+  // Force Gregorian calendar — th-TH defaults to Buddhist Era (e.g. "23/5/69"
+  // for 2026 CE), which confuses owners who think of years as 2025/2026.
+  return new Date(iso).toLocaleString("th-TH-u-ca-gregory", {
     dateStyle: "short",
     timeStyle: "short",
   });

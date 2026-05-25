@@ -7,7 +7,7 @@
 //   - takes a width param so it formats correctly on 58 / 76 / 80mm
 //     thermal paper (different col counts)
 
-import { formatTime } from "./format";
+import { formatDateTime } from "./format";
 import { DICTIONARIES } from "./i18n/dict";
 import { DEFAULT_LOCALE, type Locale } from "./i18n/types";
 import { pickName } from "./i18n/localized";
@@ -117,9 +117,10 @@ export function buildKitchenTicketBytes(
   line(t("kit.ticket.table", { n: input.tableNumber }));
   push(BOLD_OFF);
   push(SIZE_NORMAL);
-  // Short order id (last 4 of uuid) + time stamp.
+  // Short order id (last 4 of uuid) + date+time stamp so the cook can
+  // tell tickets apart across shifts and reprints.
   const shortId = input.order.id.slice(-4).toUpperCase();
-  line(`#${shortId} · ${formatTime(input.order.created_at)}`);
+  line(`#${shortId} · ${formatDateTime(input.order.created_at)}`);
   push(ALIGN_LEFT);
   line(rule("=", cols));
 

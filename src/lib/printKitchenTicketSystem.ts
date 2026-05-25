@@ -8,7 +8,7 @@
 // write HTML first, then wait for fonts/images, THEN call window.print().
 // Hooking iframe.onload fires before doc.write() and prints a blank page.
 
-import { formatTime } from "./format";
+import { formatDateTime } from "./format";
 import { DICTIONARIES } from "./i18n/dict";
 import { DEFAULT_LOCALE, type Locale } from "./i18n/types";
 import { pickName } from "./i18n/localized";
@@ -203,7 +203,7 @@ function renderHTML(input: PrintKitchenTicketInput): string {
   ${input.badge ? `<div class="badge">** ${escape(input.badge)} **</div>` : ""}
   <div class="header">
     <h1>${escape(tableLine)}</h1>
-    <div class="sub">#${escape(shortId)} · ${escape(formatTime(input.order.created_at))}</div>
+    <div class="sub">#${escape(shortId)} · ${escape(formatDateTime(input.order.created_at))}</div>
   </div>
   <div class="double-rule"></div>
   <ul>${rows.join("")}</ul>
