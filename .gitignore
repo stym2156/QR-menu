@@ -15,3 +15,11 @@ tsconfig.tsbuildinfo
 .claude/
 .idea/
 .vscode/
+
+# Playwright
+playwright-report/
+test-results/
+playwright/.cache/
+
+# Sentry
+.sentryclirc
