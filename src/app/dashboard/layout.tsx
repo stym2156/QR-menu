@@ -1,12 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMembership } from "@/lib/membership";
 import { SoundProvider } from "@/components/SoundProvider";
-import { SoundToggle } from "@/components/SoundToggle";
-import { LanguageSwitcher } from "@/lib/i18n/LanguageSwitcher";
-import SignOutButton from "./SignOutButton";
-import TopNav from "./TopNav";
+import Sidebar from "./Sidebar";
 
 export default async function DashboardLayout({
   children,
@@ -35,37 +31,14 @@ export default async function DashboardLayout({
   return (
     <SoundProvider restaurantId={membership?.restaurantId ?? null}>
       <div className="min-h-screen bg-canvas">
-        <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur">
-          <div className="mx-auto max-w-6xl px-5">
-            <div className="flex items-center justify-between gap-4 py-3">
-              <Link
-                href="/dashboard"
-                className="shrink-0 text-base font-semibold tracking-tight text-ink"
-              >
-                QR Menu
-              </Link>
-              <div className="flex shrink-0 items-center gap-3">
-                <LanguageSwitcher variant="compact" />
-                <SoundToggle />
-                <span className="hidden max-w-[14ch] truncate text-xs text-muted sm:inline">
-                  {restaurantName}
-                </span>
-                {role === "staff" ? (
-                  <span className="hidden rounded-full bg-canvas px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted sm:inline">
-                    staff
-                  </span>
-                ) : null}
-                <div className="hidden sm:block">
-                  <SignOutButton />
-                </div>
-              </div>
-            </div>
-            <div className="border-t border-line py-2">
-              <TopNav role={role} restaurantId={membership?.restaurantId ?? null} />
-            </div>
-          </div>
-        </header>
-        <main className="mx-auto max-w-6xl px-5 py-8">{children}</main>
+        <Sidebar
+          role={role}
+          restaurantId={membership?.restaurantId ?? null}
+          restaurantName={restaurantName}
+        />
+        <main className="lg:pl-64">
+          <div className="mx-auto max-w-6xl px-5 py-6 sm:py-8">{children}</div>
+        </main>
       </div>
     </SoundProvider>
   );

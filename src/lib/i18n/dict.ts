@@ -103,6 +103,8 @@ export const DICTIONARIES: Record<Locale, Dict> = {
     "nav.stats": "สถิติ",
     "nav.feedback": "ความคิดเห็น",
     "nav.settings": "ตั้งค่า",
+    "nav.open_menu": "เปิดเมนู",
+    "nav.close_menu": "ปิดเมนู",
     "nav.signout": "ออกจากระบบ",
 
     // customer menu
@@ -803,6 +805,8 @@ export const DICTIONARIES: Record<Locale, Dict> = {
     "nav.stats": "ສະຖິຕິ",
     "nav.feedback": "ຕິດຕໍ່ສູນ",
     "nav.settings": "ຕັ້ງຄ່າ",
+    "nav.open_menu": "ເປີດເມນູ",
+    "nav.close_menu": "ປິດເມນູ",
     "nav.signout": "ອອກຈາກລະບົບ",
 
     "cust.scan_title": "ເມນູ — ໂຕະ {table}",
@@ -1484,6 +1488,8 @@ export const DICTIONARIES: Record<Locale, Dict> = {
     "nav.feedback": "sport",
     "nav.settings": "Settings",
     "nav.signout": "Sign out",
+    "nav.open_menu": "Open menu",
+    "nav.close_menu": "Close menu",
 
     "cust.scan_title": "Menu — Table {table}",
     "cust.hours": "Open",
