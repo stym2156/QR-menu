@@ -13,6 +13,7 @@ import { KitchenPrinterBar } from "./KitchenPrinterBar";
 import { buildKitchenTicketBytes } from "@/lib/escposKitchenTicket";
 import { getActivePrinter, printToActivePrinter } from "@/lib/printer";
 import { printKitchenTicketSystem } from "@/lib/printKitchenTicketSystem";
+import { logAudit } from "@/lib/audit";
 import type { DiningTable, Menu, Order } from "@/lib/types";
 import type { Locale } from "@/lib/i18n/types";
 
@@ -102,13 +103,22 @@ export default function KitchenDisplay({
         toast.error(t("kit.complete_fail", { error: error.message }));
         return false;
       }
+      void logAudit(supabase, restaurantId, {
+        action: "order.served",
+        targetId: order.id,
+        details: {
+          table_number: tableMap.get(order.table_id)?.table_number ?? null,
+          total: order.total,
+          item_count: (order.items ?? []).length,
+        },
+      });
       if (!options?.silent) {
         const tableNum = tableMap.get(order.table_id)?.table_number;
         toast.success(t("kit.done_toast", { n: tableNum ?? "?" }));
       }
       return true;
     },
-    [supabase, toast, t, tableMap],
+    [supabase, toast, t, tableMap, restaurantId],
   );
 
   const handleNewOrder = useCallback(
@@ -354,6 +364,15 @@ export default function KitchenDisplay({
       setHistory((prev) => prev.filter((o) => o.id !== order.id));
       toast.error(t("kit.cancel_fail", { error: error.message }));
     } else {
+      void logAudit(supabase, restaurantId, {
+        action: "order.cancel",
+        targetId: order.id,
+        details: {
+          table_number: tableNum ?? null,
+          reason,
+          total: order.total,
+        },
+      });
       toast.success(t("kit.cancel_toast", { n: tableNum ?? "?" }));
     }
   }

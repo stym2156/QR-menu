@@ -137,6 +137,32 @@ const NAV: NavItem[] = [
     ),
   },
   {
+    href: "/dashboard/close-shop",
+    labelKey: "nav.close_shop",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3 7h18M5 7v13a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7M9 4h6v3H9zM10 12h4M10 16h4"
+        />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/audit",
+    labelKey: "nav.audit",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9 12l2 2 4-4M12 3a9 9 0 1 0 9 9 9 9 0 0 0-9-9Z"
+        />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard/feedback",
     labelKey: "nav.feedback",
     icon: (

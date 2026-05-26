@@ -10,6 +10,7 @@ import { printReceipt } from "./receipt";
 import { BillModal, type BillGroup } from "./BillModal";
 import SettledBills from "./SettledBills";
 import { BluetoothPrinterButton } from "./BluetoothPrinterButton";
+import { logAudit } from "@/lib/audit";
 import type {
   CallStaffRequest,
   DiningTable,
@@ -235,6 +236,18 @@ export default function BillsView({
     if (closeError) {
       toast.error(t("bill.close_failed", { error: closeError.message }));
     }
+
+    const totalSettled = tableOrders.reduce((s, o) => s + Number(o.total), 0);
+    void logAudit(supabase, restaurantId, {
+      action: "bill.settle",
+      targetId: tableId,
+      details: {
+        table_number: tableMap.get(tableId)?.table_number ?? null,
+        order_ids: ids,
+        method,
+        total: totalSettled,
+      },
+    });
 
     setLastSettled({
       orders: tableOrders,
