@@ -56,6 +56,7 @@ export default function TableManager({
   const [busy, setBusy] = useState(false);
   const [zoneBusy, setZoneBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [zoneError, setZoneError] = useState<string | null>(null);
   const [origin, setOrigin] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [zoneFilter, setZoneFilter] = useState<string>("all");
@@ -117,7 +118,7 @@ export default function TableManager({
     const name = newZoneName.trim();
     if (!name) return;
 
-    setError(null);
+    setZoneError(null);
     setZoneBusy(true);
     const nextSort = zones.length > 0 ? Math.max(...zones.map((z) => z.sort_order)) + 1 : 0;
     const { data, error: insertError } = await supabase
@@ -128,7 +129,11 @@ export default function TableManager({
 
     setZoneBusy(false);
     if (insertError || !data) {
-      setError(`เพิ่มโซนไม่สำเร็จ: ${insertError?.message ?? ""}`);
+      const message =
+        insertError?.code === "23505"
+          ? `มีโซนชื่อ "${name}" อยู่แล้ว`
+          : `เพิ่มโซนไม่สำเร็จ: ${insertError?.message ?? ""}`;
+      setZoneError(message);
       return;
     }
     const zone = data as TableZone;
@@ -168,6 +173,19 @@ export default function TableManager({
 
   async function moveTableToZone(table: DiningTable, zoneId: string): Promise<void> {
     if (table.zone_id === zoneId) return;
+    const targetZone = zoneMap.get(zoneId);
+    const duplicate = tables.some(
+      (x) =>
+        x.id !== table.id &&
+        x.zone_id === zoneId &&
+        x.table_number === table.table_number,
+    );
+    if (duplicate) {
+      toast.error(
+        `ย้ายไม่ได้: มีโต๊ะ ${table.table_number} ในโซน ${targetZone?.name ?? ""} อยู่แล้ว`,
+      );
+      return;
+    }
     const previousZoneId = table.zone_id;
     setTables((prev) =>
       prev.map((x) => (x.id === table.id ? { ...x, zone_id: zoneId } : x)),
@@ -202,6 +220,17 @@ export default function TableManager({
       setBusy(false);
       return;
     }
+    const selectedZone = zoneMap.get(selectedZoneId);
+    const duplicate = tables.some(
+      (table) => table.zone_id === selectedZoneId && table.table_number === num,
+    );
+    if (duplicate) {
+      setError(
+        `โต๊ะ ${num} มีอยู่แล้วในโซน ${selectedZone?.name ?? ""} ถ้าต้องการเลขซ้ำ ให้เลือกคนละโซนก่อนเพิ่ม`,
+      );
+      setBusy(false);
+      return;
+    }
 
     const { data, error: insertError } = await supabase
       .from("tables")
@@ -214,7 +243,11 @@ export default function TableManager({
       .single();
 
     if (insertError || !data) {
-      setError(t("mgr.tbl.add_failed", { error: insertError?.message ?? "" }));
+      const message =
+        insertError?.code === "23505"
+          ? `โต๊ะ ${num} มีอยู่แล้วในโซน ${selectedZone?.name ?? ""}`
+          : t("mgr.tbl.add_failed", { error: insertError?.message ?? "" });
+      setError(message);
       setBusy(false);
       return;
     }
@@ -307,6 +340,11 @@ export default function TableManager({
             >
               {zoneBusy ? "กำลังเพิ่ม..." : "+ เพิ่มโซน"}
             </button>
+            {zoneError ? (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                {zoneError}
+              </p>
+            ) : null}
             {zones.length > 0 ? (
               <div className="space-y-1.5">
                 {zones.map((zone) => {
