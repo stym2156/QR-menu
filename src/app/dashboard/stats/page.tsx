@@ -3,7 +3,7 @@ import NoShopMessage from "@/components/NoShopMessage";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMembership, isOwner } from "@/lib/membership";
 import StatsView from "./StatsView";
-import type { Category, Menu, Order } from "@/lib/types";
+import type { Category, DiningTable, Menu, Order, TableZone } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,13 @@ export default async function StatsPage() {
   const since = new Date();
   since.setDate(since.getDate() - 30);
 
-  const [{ data: orders }, { data: menus }, { data: categories }] = await Promise.all([
+  const [
+    { data: orders },
+    { data: menus },
+    { data: categories },
+    { data: tables },
+    { data: zones },
+  ] = await Promise.all([
     supabase
       .from("orders")
       .select("*")
@@ -38,6 +44,13 @@ export default async function StatsPage() {
       .select("*")
       .eq("restaurant_id", membership.restaurantId)
       .order("sort_order", { ascending: true }),
+    supabase.from("tables").select("*").eq("restaurant_id", membership.restaurantId),
+    supabase
+      .from("table_zones")
+      .select("*")
+      .eq("restaurant_id", membership.restaurantId)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true }),
   ]);
 
   return (
@@ -46,6 +59,8 @@ export default async function StatsPage() {
         orders={(orders ?? []) as Order[]}
         menus={(menus ?? []) as Menu[]}
         categories={(categories ?? []) as Category[]}
+        tables={(tables ?? []) as DiningTable[]}
+        zones={(zones ?? []) as TableZone[]}
       />
     </div>
   );

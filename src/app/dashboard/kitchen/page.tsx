@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { canActKitchen, canSeeKitchen, getCurrentMembership } from "@/lib/membership";
 import KitchenDisplay from "./KitchenDisplay";
 import I18nPageHeader from "@/components/I18nPageHeader";
-import type { DiningTable, Menu, Order } from "@/lib/types";
+import type { DiningTable, Menu, Order, TableZone } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +31,7 @@ export default async function KitchenPage() {
     { data: history },
     { data: menus },
     { data: tables },
+    { data: zones },
     { data: members },
     { data: restaurantRow },
   ] = await Promise.all([
@@ -50,6 +51,12 @@ export default async function KitchenPage() {
       .limit(100),
     supabase.from("menus").select("*").eq("restaurant_id", restaurant.id),
     supabase.from("tables").select("*").eq("restaurant_id", restaurant.id),
+    supabase
+      .from("table_zones")
+      .select("*")
+      .eq("restaurant_id", restaurant.id)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true }),
     supabase.rpc("lookup_member_emails", { rid: restaurant.id }),
     supabase
       .from("restaurants")
@@ -72,6 +79,7 @@ export default async function KitchenPage() {
         initialHistory={(history ?? []) as Order[]}
         menus={(menus ?? []) as Menu[]}
         tables={(tables ?? []) as DiningTable[]}
+        zones={(zones ?? []) as TableZone[]}
         memberEmails={memberEmails}
         canAct={canActKitchen(membership.role)}
         kitchenPrintWidth={

@@ -18,9 +18,18 @@ export type Restaurant = {
 export type DiningTable = {
   id: string;
   restaurant_id: string;
+  zone_id: string;
   table_number: number;
   qr_url: string | null;
   is_open: boolean;
+  created_at: string;
+};
+
+export type TableZone = {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  sort_order: number;
   created_at: string;
 };
 

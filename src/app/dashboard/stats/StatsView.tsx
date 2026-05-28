@@ -5,12 +5,14 @@ import { formatKIP, formatDateTime } from "@/lib/format";
 import { EmptyState, SectionHeading, card, cardPad } from "@/components/ui";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { pickName } from "@/lib/i18n/localized";
-import type { Category, Menu, Order } from "@/lib/types";
+import type { Category, DiningTable, Menu, Order, TableZone } from "@/lib/types";
 
 interface Props {
   orders: Order[];
   menus: Menu[];
   categories: Category[];
+  tables: DiningTable[];
+  zones: TableZone[];
 }
 
 type RangeKey = "today" | "7d" | "30d";
@@ -33,9 +35,11 @@ function rangeStart(key: RangeKey): number {
   return startOfDay(new Date(Date.now() - 29 * 86_400_000)).getTime();
 }
 
-export default function StatsView({ orders, menus, categories }: Props) {
+export default function StatsView({ orders, menus, categories, tables, zones }: Props) {
   const { t, locale } = useT();
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
+  const tableMap = useMemo(() => new Map(tables.map((table) => [table.id, table])), [tables]);
+  const zoneMap = useMemo(() => new Map(zones.map((zone) => [zone.id, zone])), [zones]);
   const categoryMap = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
     [categories],
@@ -57,12 +61,25 @@ export default function StatsView({ orders, menus, categories }: Props) {
 
     const byDay = new Map<string, { revenue: number; orders: number }>();
     const byMenu = new Map<string, { qty: number; revenue: number }>();
+    const byZone = new Map<string, { revenue: number; orders: number; tables: Set<string> }>();
 
     for (const order of orders) {
       const t = new Date(order.created_at).getTime();
       const total = Number(order.total);
+      const table = tableMap.get(order.table_id);
+      const zoneId = table?.zone_id ?? "unknown";
       monthRevenue += total;
       monthOrders += 1;
+
+      const zoneBucket = byZone.get(zoneId) ?? {
+        revenue: 0,
+        orders: 0,
+        tables: new Set<string>(),
+      };
+      zoneBucket.revenue += total;
+      zoneBucket.orders += 1;
+      zoneBucket.tables.add(order.table_id);
+      byZone.set(zoneId, zoneBucket);
 
       if (t >= weekStart) {
         weekRevenue += total;
@@ -106,6 +123,16 @@ export default function StatsView({ orders, menus, categories }: Props) {
       .sort((a, b) => b.qty - a.qty)
       .slice(0, 10);
 
+    const zoneSales = Array.from(byZone.entries())
+      .map(([id, b]) => ({
+        id,
+        name: zoneMap.get(id)?.name ?? "ไม่ระบุโซน",
+        revenue: b.revenue,
+        orders: b.orders,
+        tables: b.tables.size,
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
+
     return {
       todayRevenue,
       todayOrders,
@@ -115,8 +142,9 @@ export default function StatsView({ orders, menus, categories }: Props) {
       monthOrders,
       last7Days,
       topMenus,
+      zoneSales,
     };
-  }, [orders, menuMap]);
+  }, [orders, menuMap, tableMap, zoneMap]);
 
   const maxRevenue = Math.max(1, ...stats.last7Days.map((d) => d.revenue));
   const hasData = orders.length > 0;
@@ -243,6 +271,49 @@ export default function StatsView({ orders, menus, categories }: Props) {
                       </span>
                       <span className="shrink-0 text-xs tabular-nums text-muted">
                         {t("stats.top.qty_revenue", { qty: row.qty, revenue: formatKIP(row.revenue) })}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-line">
+                      <div
+                        className="h-full rounded-full bg-ink"
+                        style={{ width: `${barPct}%` }}
+                      />
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </div>
+
+      <div className={`${card} ${cardPad}`}>
+        <SectionHeading
+          title="ยอดขายตามโซน"
+          description="รวมยอดจากโต๊ะในแต่ละโซนใน 30 วันล่าสุด"
+        />
+        {stats.zoneSales.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted">{t("stats.top.empty")}</p>
+        ) : (
+          <ol className="space-y-2">
+            {stats.zoneSales.map((row, idx) => {
+              const max = Math.max(1, stats.zoneSales[0].revenue);
+              const barPct = (row.revenue / max) * 100;
+              return (
+                <li
+                  key={row.id}
+                  className="flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-canvas"
+                >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-canvas text-xs font-semibold tabular-nums text-ink">
+                    {idx + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="truncate text-sm font-medium text-ink">
+                        {row.name}
+                      </span>
+                      <span className="shrink-0 text-xs tabular-nums text-muted">
+                        {row.orders} ออเดอร์ · {row.tables} โต๊ะ · {formatKIP(row.revenue)}
                       </span>
                     </div>
                     <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-line">

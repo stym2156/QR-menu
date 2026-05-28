@@ -9,7 +9,7 @@ import {
 } from "@/lib/membership";
 import TableManager from "./TableManager";
 import I18nPageHeader from "@/components/I18nPageHeader";
-import type { DiningTable } from "@/lib/types";
+import type { DiningTable, TableZone } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -27,11 +27,19 @@ export default async function TablesPage() {
   }
   if (!canSeeTables(membership.role)) redirect("/dashboard");
 
-  const { data: tables } = await supabase
-    .from("tables")
-    .select("*")
-    .eq("restaurant_id", membership.restaurantId)
-    .order("table_number", { ascending: true });
+  const [{ data: tables }, { data: zones }] = await Promise.all([
+    supabase
+      .from("tables")
+      .select("*")
+      .eq("restaurant_id", membership.restaurantId)
+      .order("table_number", { ascending: true }),
+    supabase
+      .from("table_zones")
+      .select("*")
+      .eq("restaurant_id", membership.restaurantId)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true }),
+  ]);
 
   return (
     <div>
@@ -46,6 +54,7 @@ export default async function TablesPage() {
       <TableManager
         restaurantId={membership.restaurantId}
         initialTables={(tables ?? []) as DiningTable[]}
+        initialZones={(zones ?? []) as TableZone[]}
         canManage={canManageTables(membership.role)}
         canAct={canActTables(membership.role)}
       />

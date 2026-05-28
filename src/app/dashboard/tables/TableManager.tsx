@@ -17,20 +17,30 @@ import {
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/toast";
 import { useT } from "@/lib/i18n/I18nProvider";
-import type { DiningTable } from "@/lib/types";
+import type { DiningTable, TableZone } from "@/lib/types";
 
 interface Props {
   restaurantId: string;
   initialTables: DiningTable[];
-  // Owner only — controls add + delete UI.
+  initialZones: TableZone[];
+  // Owner only - controls add + delete UI.
   canManage: boolean;
-  // Owner + waiter — controls open/close toggle. Cook gets read-only.
+  // Owner + waiter - controls open/close toggle. Cook gets read-only.
   canAct: boolean;
 }
+
+type TableGroup = {
+  zone: TableZone | null;
+  tables: DiningTable[];
+};
+
+const zoneSort = (a: TableZone, b: TableZone) =>
+  a.sort_order - b.sort_order || a.name.localeCompare(b.name);
 
 export default function TableManager({
   restaurantId,
   initialTables,
+  initialZones,
   canManage,
   canAct,
 }: Props) {
@@ -39,23 +49,142 @@ export default function TableManager({
   const toast = useToast();
   const { t } = useT();
   const [tables, setTables] = useState<DiningTable[]>(initialTables);
+  const [zones, setZones] = useState<TableZone[]>([...initialZones].sort(zoneSort));
   const [tableNumber, setTableNumber] = useState("");
+  const [selectedZoneId, setSelectedZoneId] = useState(initialZones[0]?.id ?? "");
+  const [newZoneName, setNewZoneName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [zoneBusy, setZoneBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [origin, setOrigin] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [zoneFilter, setZoneFilter] = useState<string>("all");
 
-  // Substring match on the stringified table number. Typing "5" matches
-  // table 5, 50–59, 105, 500, etc. — sorted ascending so 5 appears first.
+  const zoneMap = useMemo(() => new Map(zones.map((z) => [z.id, z])), [zones]);
+
   const filteredTables = useMemo(() => {
-    const q = searchQuery.trim();
-    if (!q) return tables;
-    return tables.filter((t) => String(t.table_number).includes(q));
-  }, [tables, searchQuery]);
+    const q = searchQuery.trim().toLowerCase();
+    return tables.filter((table) => {
+      const zone = zoneMap.get(table.zone_id);
+      const matchesZone = zoneFilter === "all" || table.zone_id === zoneFilter;
+      const matchesSearch =
+        !q ||
+        String(table.table_number).includes(q) ||
+        (zone?.name.toLowerCase().includes(q) ?? false);
+      return matchesZone && matchesSearch;
+    });
+  }, [tables, searchQuery, zoneFilter, zoneMap]);
+
+  const groupedTables = useMemo<TableGroup[]>(() => {
+    const byZone = new Map<string, DiningTable[]>();
+    const unknown: DiningTable[] = [];
+    for (const table of filteredTables) {
+      if (!zoneMap.has(table.zone_id)) {
+        unknown.push(table);
+        continue;
+      }
+      const list = byZone.get(table.zone_id) ?? [];
+      list.push(table);
+      byZone.set(table.zone_id, list);
+    }
+    const groups: TableGroup[] = zones
+      .map((zone) => ({
+        zone,
+        tables: (byZone.get(zone.id) ?? []).sort(
+          (a, b) => a.table_number - b.table_number,
+        ),
+      }))
+      .filter((group) => group.tables.length > 0);
+    if (unknown.length > 0) {
+      groups.push({
+        zone: null,
+        tables: unknown.sort((a, b) => a.table_number - b.table_number),
+      });
+    }
+    return groups;
+  }, [filteredTables, zoneMap, zones]);
 
   useEffect(() => {
     setOrigin(window.location.origin);
   }, []);
+
+  useEffect(() => {
+    if (!selectedZoneId && zones[0]) setSelectedZoneId(zones[0].id);
+  }, [selectedZoneId, zones]);
+
+  async function handleAddZone(e: React.FormEvent): Promise<void> {
+    e.preventDefault();
+    const name = newZoneName.trim();
+    if (!name) return;
+
+    setError(null);
+    setZoneBusy(true);
+    const nextSort = zones.length > 0 ? Math.max(...zones.map((z) => z.sort_order)) + 1 : 0;
+    const { data, error: insertError } = await supabase
+      .from("table_zones")
+      .insert({ restaurant_id: restaurantId, name, sort_order: nextSort })
+      .select()
+      .single();
+
+    setZoneBusy(false);
+    if (insertError || !data) {
+      setError(`เพิ่มโซนไม่สำเร็จ: ${insertError?.message ?? ""}`);
+      return;
+    }
+    const zone = data as TableZone;
+    setZones((prev) => [...prev, zone].sort(zoneSort));
+    setSelectedZoneId(zone.id);
+    setZoneFilter("all");
+    setNewZoneName("");
+    toast.success(`เพิ่มโซน ${zone.name} แล้ว`);
+  }
+
+  async function deleteZone(zone: TableZone): Promise<void> {
+    const usedCount = tables.filter((table) => table.zone_id === zone.id).length;
+    if (usedCount > 0) {
+      toast.error(`ยังลบโซนนี้ไม่ได้ เพราะมี ${usedCount} โต๊ะอยู่ในโซน`);
+      return;
+    }
+    const ok = await confirm({
+      title: `ลบโซน "${zone.name}"?`,
+      description: "โต๊ะในโซนนี้ต้องถูกย้ายหรือลบออกก่อน จึงจะลบโซนได้",
+      confirmText: t("common.delete"),
+      tone: "danger",
+    });
+    if (!ok) return;
+    const { error: deleteError } = await supabase
+      .from("table_zones")
+      .delete()
+      .eq("id", zone.id);
+    if (deleteError) {
+      toast.error(`ลบโซนไม่สำเร็จ: ${deleteError.message}`);
+      return;
+    }
+    setZones((prev) => prev.filter((z) => z.id !== zone.id));
+    if (selectedZoneId === zone.id) setSelectedZoneId(zones.find((z) => z.id !== zone.id)?.id ?? "");
+    if (zoneFilter === zone.id) setZoneFilter("all");
+    toast.success(`ลบโซน ${zone.name} แล้ว`);
+  }
+
+  async function moveTableToZone(table: DiningTable, zoneId: string): Promise<void> {
+    if (table.zone_id === zoneId) return;
+    const previousZoneId = table.zone_id;
+    setTables((prev) =>
+      prev.map((x) => (x.id === table.id ? { ...x, zone_id: zoneId } : x)),
+    );
+    const { error: updateError } = await supabase
+      .from("tables")
+      .update({ zone_id: zoneId })
+      .eq("id", table.id);
+    if (updateError) {
+      setTables((prev) =>
+        prev.map((x) => (x.id === table.id ? { ...x, zone_id: previousZoneId } : x)),
+      );
+      toast.error(`ย้ายโซนไม่สำเร็จ: ${updateError.message}`);
+      return;
+    }
+    toast.success(`ย้ายโต๊ะ ${table.table_number} แล้ว`);
+  }
 
   async function handleAdd(e: React.FormEvent): Promise<void> {
     e.preventDefault();
@@ -68,10 +197,19 @@ export default function TableManager({
       setBusy(false);
       return;
     }
+    if (!selectedZoneId) {
+      setError("กรุณาเพิ่มหรือเลือกโซนก่อนเพิ่มโต๊ะ");
+      setBusy(false);
+      return;
+    }
 
     const { data, error: insertError } = await supabase
       .from("tables")
-      .insert({ restaurant_id: restaurantId, table_number: num })
+      .insert({
+        restaurant_id: restaurantId,
+        table_number: num,
+        zone_id: selectedZoneId,
+      })
       .select()
       .single();
 
@@ -97,16 +235,17 @@ export default function TableManager({
     });
     if (!ok) return;
     setTables((prev) => prev.filter((x) => x.id !== table.id));
-    const { error } = await supabase.from("tables").delete().eq("id", table.id);
-    if (error) toast.error(t("mgr.tbl.delete_failed", { error: error.message }));
+    const { error: deleteError } = await supabase.from("tables").delete().eq("id", table.id);
+    if (deleteError) toast.error(t("mgr.tbl.delete_failed", { error: deleteError.message }));
     else toast.success(t("mgr.tbl.deleted_toast", { n: table.table_number }));
   }
 
   async function downloadQR(table: DiningTable): Promise<void> {
     const url = `${origin}/menu/${restaurantId}/${table.id}`;
+    const zone = zoneMap.get(table.zone_id);
     const dataUrl = await qrWithLabel({
       url,
-      label: String(table.table_number),
+      label: zone ? `${zone.name} / ${table.table_number}` : String(table.table_number),
       size: 600,
     });
     const link = document.createElement("a");
@@ -120,12 +259,12 @@ export default function TableManager({
     setTables((prev) =>
       prev.map((x) => (x.id === table.id ? { ...x, is_open: next } : x)),
     );
-    const { error } = await supabase
+    const { error: updateError } = await supabase
       .from("tables")
       .update({ is_open: next })
       .eq("id", table.id);
-    if (error) {
-      toast.error(t("mgr.tbl.update_failed", { error: error.message }));
+    if (updateError) {
+      toast.error(t("mgr.tbl.update_failed", { error: updateError.message }));
       setTables((prev) =>
         prev.map((x) => (x.id === table.id ? { ...x, is_open: !next } : x)),
       );
@@ -147,29 +286,108 @@ export default function TableManager({
       }
     >
       {canManage ? (
-        <form onSubmit={handleAdd} className={`${card} ${cardPad} h-fit space-y-4 lg:sticky lg:top-20`}>
-          <SectionHeading title={t("mgr.tbl.add_title")} />
-
-          <FormField label={t("mgr.tbl.number")}>
-            <input
-              type="number"
-              min="1"
-              value={tableNumber}
-              onChange={(e) => setTableNumber(e.target.value)}
-              required
-              className={`${input} tabular-nums`}
-              placeholder="1"
+        <div className="space-y-4 lg:sticky lg:top-20 lg:h-fit">
+          <form onSubmit={handleAddZone} className={`${card} ${cardPad} space-y-4`}>
+            <SectionHeading
+              title="โซน"
+              description="เช่น ชั้น 1, ชั้น 2, VIP, โซน A"
             />
-          </FormField>
+            <FormField label="ชื่อโซน">
+              <input
+                value={newZoneName}
+                onChange={(e) => setNewZoneName(e.target.value)}
+                className={input}
+                placeholder="ชั้น 1"
+              />
+            </FormField>
+            <button
+              type="submit"
+              disabled={zoneBusy || !newZoneName.trim()}
+              className={`${buttonSecondary} w-full`}
+            >
+              {zoneBusy ? "กำลังเพิ่ม..." : "+ เพิ่มโซน"}
+            </button>
+            {zones.length > 0 ? (
+              <div className="space-y-1.5">
+                {zones.map((zone) => {
+                  const count = tables.filter((table) => table.zone_id === zone.id).length;
+                  return (
+                    <div
+                      key={zone.id}
+                      className="flex items-center justify-between gap-2 rounded-xl border border-line px-3 py-2 text-sm"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setZoneFilter(zone.id)}
+                        className="min-w-0 truncate text-left font-medium text-ink hover:underline"
+                      >
+                        {zone.name}
+                      </button>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="text-xs tabular-nums text-muted">{count}</span>
+                        <button
+                          type="button"
+                          onClick={() => deleteZone(zone)}
+                          className="rounded-lg px-2 py-1 text-xs text-muted transition hover:bg-red-50 hover:text-red-600"
+                        >
+                          {t("common.delete")}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                ยังไม่มีโซน ถ้าเพิ่งอัปเดตระบบ กรุณารัน SQL migration ก่อน
+              </p>
+            )}
+          </form>
 
-          {error ? (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-          ) : null}
+          <form onSubmit={handleAdd} className={`${card} ${cardPad} space-y-4`}>
+            <SectionHeading title={t("mgr.tbl.add_title")} />
 
-          <button type="submit" disabled={busy} className={`${buttonPrimary} w-full`}>
-            {busy ? t("mgr.tbl.submitting") : t("mgr.tbl.submit")}
-          </button>
-        </form>
+            <FormField label="โซน">
+              <select
+                value={selectedZoneId}
+                onChange={(e) => setSelectedZoneId(e.target.value)}
+                required
+                className={input}
+              >
+                <option value="" disabled>
+                  เลือกโซน
+                </option>
+                {zones.map((zone) => (
+                  <option key={zone.id} value={zone.id}>
+                    {zone.name}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+
+            <FormField label={t("mgr.tbl.number")}>
+              <input
+                type="number"
+                min="1"
+                value={tableNumber}
+                onChange={(e) => setTableNumber(e.target.value)}
+                required
+                className={`${input} tabular-nums`}
+                placeholder="1"
+              />
+            </FormField>
+
+            {error ? (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                {error}
+              </p>
+            ) : null}
+
+            <button type="submit" disabled={busy || zones.length === 0} className={`${buttonPrimary} w-full`}>
+              {busy ? t("mgr.tbl.submitting") : t("mgr.tbl.submit")}
+            </button>
+          </form>
+        </div>
       ) : null}
 
       <div>
@@ -187,7 +405,7 @@ export default function TableManager({
             <SectionHeading
               title={t("mgr.tbl.list_title")}
               description={
-                searchQuery.trim()
+                searchQuery.trim() || zoneFilter !== "all"
                   ? t("mgr.tbl.search.result", {
                       found: filteredTables.length,
                       total: tables.length,
@@ -196,54 +414,79 @@ export default function TableManager({
               }
             />
 
-            <div className="relative my-3">
-              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
-                  <circle cx="11" cy="11" r="7" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m20 20-3.5-3.5" />
-                </svg>
-              </span>
-              <input
-                type="number"
-                inputMode="numeric"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t("mgr.tbl.search.placeholder")}
-                className={`${input} pl-10 pr-10 tabular-nums`}
-                autoComplete="off"
-              />
-              {searchQuery ? (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  aria-label={t("mgr.tbl.search.clear")}
-                  className="absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-muted transition hover:bg-canvas hover:text-ink"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row">
+              <div className="relative flex-1">
+                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+                    <circle cx="11" cy="11" r="7" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m20 20-3.5-3.5" />
                   </svg>
-                </button>
-              ) : null}
+                </span>
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="ค้นหาเลขโต๊ะหรือโซน..."
+                  className={`${input} pl-10 pr-10`}
+                  autoComplete="off"
+                />
+                {searchQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    aria-label={t("mgr.tbl.search.clear")}
+                    className="absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-muted transition hover:bg-canvas hover:text-ink"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                ) : null}
+              </div>
+              <select
+                value={zoneFilter}
+                onChange={(e) => setZoneFilter(e.target.value)}
+                className={`${input} sm:w-52`}
+              >
+                <option value="all">ทุกโซน</option>
+                {zones.map((zone) => (
+                  <option key={zone.id} value={zone.id}>
+                    {zone.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {filteredTables.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-line bg-surface/50 p-8 text-center text-sm text-muted">
-                {t("mgr.tbl.search.no_match", { q: searchQuery.trim() })}
+                ไม่พบโต๊ะที่ตรงกับตัวกรอง
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {filteredTables.map((table) => (
-                  <TableCard
-                    key={table.id}
-                    table={table}
-                    restaurantId={restaurantId}
-                    origin={origin}
-                    canManage={canManage}
-                    canAct={canAct}
-                    onDelete={() => deleteTable(table)}
-                    onDownload={() => downloadQR(table)}
-                    onToggleOpen={() => toggleOpen(table)}
-                  />
+              <div className="space-y-5">
+                {groupedTables.map((group) => (
+                  <section key={group.zone?.id ?? "unknown"}>
+                    <SectionHeading
+                      title={group.zone?.name ?? "ไม่ระบุโซน"}
+                      description={`${group.tables.length} โต๊ะ`}
+                    />
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      {group.tables.map((table) => (
+                        <TableCard
+                          key={table.id}
+                          table={table}
+                          zone={zoneMap.get(table.zone_id) ?? null}
+                          zones={zones}
+                          restaurantId={restaurantId}
+                          origin={origin}
+                          canManage={canManage}
+                          canAct={canAct}
+                          onDelete={() => deleteTable(table)}
+                          onDownload={() => downloadQR(table)}
+                          onToggleOpen={() => toggleOpen(table)}
+                          onMoveZone={(zoneId) => moveTableToZone(table, zoneId)}
+                        />
+                      ))}
+                    </div>
+                  </section>
                 ))}
               </div>
             )}
@@ -256,6 +499,8 @@ export default function TableManager({
 
 interface TableCardProps {
   table: DiningTable;
+  zone: TableZone | null;
+  zones: TableZone[];
   restaurantId: string;
   origin: string;
   canManage: boolean;
@@ -263,10 +508,13 @@ interface TableCardProps {
   onDelete: () => void;
   onDownload: () => void;
   onToggleOpen: () => void;
+  onMoveZone: (zoneId: string) => void;
 }
 
 function TableCard({
   table,
+  zone,
+  zones,
   restaurantId,
   origin,
   canManage,
@@ -274,6 +522,7 @@ function TableCard({
   onDelete,
   onDownload,
   onToggleOpen,
+  onMoveZone,
 }: TableCardProps) {
   const { t } = useT();
   const [qrSrc, setQrSrc] = useState<string | null>(null);
@@ -284,7 +533,7 @@ function TableCard({
     let cancelled = false;
     void qrWithLabel({
       url,
-      label: String(table.table_number),
+      label: zone ? `${zone.name} / ${table.table_number}` : String(table.table_number),
       size: 240,
       margin: 1,
     }).then((src) => {
@@ -293,7 +542,7 @@ function TableCard({
     return () => {
       cancelled = true;
     };
-  }, [url, table.table_number]);
+  }, [url, table.table_number, zone]);
 
   return (
     <div
@@ -301,27 +550,34 @@ function TableCard({
         table.is_open ? "border-emerald-200 ring-1 ring-emerald-100" : "border-line"
       }`}
     >
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-start gap-2">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-ink text-xs font-semibold tabular-nums text-surface">
             {table.table_number}
           </span>
-          <span className="text-sm font-medium text-ink">
-            {t("mgr.tbl.label", { n: table.table_number })}
-          </span>
-          {table.is_open ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-700">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-sm font-medium text-ink">
+                {t("mgr.tbl.label", { n: table.table_number })}
               </span>
-              {t("mgr.tbl.open_badge")}
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-full bg-canvas px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted">
-              {t("mgr.tbl.closed_badge")}
-            </span>
-          )}
+              {table.is_open ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-emerald-700">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  </span>
+                  {t("mgr.tbl.open_badge")}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-canvas px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted">
+                  {t("mgr.tbl.closed_badge")}
+                </span>
+              )}
+            </div>
+            <div className="mt-1 truncate text-xs text-muted">
+              {zone?.name ?? "ไม่ระบุโซน"}
+            </div>
+          </div>
         </div>
         {canManage ? (
           <button
@@ -332,6 +588,21 @@ function TableCard({
           </button>
         ) : null}
       </div>
+
+      {canManage ? (
+        <select
+          value={table.zone_id}
+          onChange={(e) => onMoveZone(e.target.value)}
+          className={`${input} mb-3 py-2 text-xs`}
+          aria-label="ย้ายโซน"
+        >
+          {zones.map((z) => (
+            <option key={z.id} value={z.id}>
+              {z.name}
+            </option>
+          ))}
+        </select>
+      ) : null}
 
       {canAct ? (
         <button

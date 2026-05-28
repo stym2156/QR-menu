@@ -14,7 +14,7 @@ import { buildKitchenTicketBytes } from "@/lib/escposKitchenTicket";
 import { getActivePrinter, printToActivePrinter } from "@/lib/printer";
 import { printKitchenTicketSystem } from "@/lib/printKitchenTicketSystem";
 import { logAudit } from "@/lib/audit";
-import type { DiningTable, Menu, Order } from "@/lib/types";
+import type { DiningTable, Menu, Order, TableZone } from "@/lib/types";
 import type { Locale } from "@/lib/i18n/types";
 
 interface Props {
@@ -23,6 +23,7 @@ interface Props {
   initialHistory: Order[];
   menus: Menu[];
   tables: DiningTable[];
+  zones: TableZone[];
   memberEmails: Record<string, string>;
   canAct: boolean;
   kitchenPrintWidth: number;
@@ -36,6 +37,7 @@ export default function KitchenDisplay({
   initialHistory,
   menus,
   tables,
+  zones,
   memberEmails,
   canAct,
   kitchenPrintWidth,
@@ -47,6 +49,7 @@ export default function KitchenDisplay({
   const [history, setHistory] = useState<Order[]>(initialHistory);
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
   const [tab, setTab] = useState<KitchenTab>("active");
+  const [zoneFilter, setZoneFilter] = useState("all");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [autoPrintEnabled, setAutoPrintEnabled] = useState(false);
   const [systemPrintEnabled, setSystemPrintEnabled] = useState(false);
@@ -55,6 +58,7 @@ export default function KitchenDisplay({
 
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
   const tableMap = useMemo(() => new Map(tables.map((t) => [t.id, t])), [tables]);
+  const zoneMap = useMemo(() => new Map(zones.map((z) => [z.id, z])), [zones]);
 
   // Keep refs in sync — the realtime callback below captures them at subscribe
   // time, so we use refs to read the latest values.
@@ -402,6 +406,16 @@ export default function KitchenDisplay({
     });
   }, [orders]);
 
+  const filteredActiveOrders = useMemo(() => {
+    if (zoneFilter === "all") return activeOrders;
+    return activeOrders.filter((order) => tableMap.get(order.table_id)?.zone_id === zoneFilter);
+  }, [activeOrders, tableMap, zoneFilter]);
+
+  const filteredHistory = useMemo(() => {
+    if (zoneFilter === "all") return history;
+    return history.filter((order) => tableMap.get(order.table_id)?.zone_id === zoneFilter);
+  }, [history, tableMap, zoneFilter]);
+
   return (
     <div className="space-y-4">
       {canAct ? (
@@ -416,7 +430,7 @@ export default function KitchenDisplay({
       <div className="flex gap-1.5 rounded-xl bg-canvas p-1">
         <TabButton
           label={t("kit.tab.active")}
-          count={activeOrders.length}
+          count={filteredActiveOrders.length}
           active={tab === "active"}
           onClick={() => setTab("active")}
         />
@@ -427,11 +441,30 @@ export default function KitchenDisplay({
         />
       </div>
 
+      {zones.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          <ZoneChip
+            label="ทุกโซน"
+            active={zoneFilter === "all"}
+            onClick={() => setZoneFilter("all")}
+          />
+          {zones.map((zone) => (
+            <ZoneChip
+              key={zone.id}
+              label={zone.name}
+              active={zoneFilter === zone.id}
+              onClick={() => setZoneFilter(zone.id)}
+            />
+          ))}
+        </div>
+      ) : null}
+
       {tab === "active" ? (
         <ActiveList
-          orders={activeOrders}
+          orders={filteredActiveOrders}
           menuMap={menuMap}
           tableMap={tableMap}
+          zoneMap={zoneMap}
           locale={locale}
           canAct={canAct}
           busyId={busyId}
@@ -441,9 +474,10 @@ export default function KitchenDisplay({
         />
       ) : (
         <HistoryList
-          orders={history}
+          orders={filteredHistory}
           menuMap={menuMap}
           tableMap={tableMap}
+          zoneMap={zoneMap}
           locale={locale}
           memberEmails={memberEmails}
         />
@@ -457,6 +491,28 @@ export default function KitchenDisplay({
         />
       ) : null}
     </div>
+  );
+}
+
+interface ZoneChipProps {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}
+
+function ZoneChip({ label, active, onClick }: ZoneChipProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+        active
+          ? "bg-ink text-surface"
+          : "border border-line bg-surface text-ink hover:border-ink/30 hover:bg-canvas"
+      }`}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -494,6 +550,7 @@ interface ActiveListProps {
   orders: Order[];
   menuMap: Map<string, Menu>;
   tableMap: Map<string, DiningTable>;
+  zoneMap: Map<string, TableZone>;
   locale: ReturnType<typeof useT>["locale"];
   canAct: boolean;
   busyId: string | null;
@@ -506,6 +563,7 @@ function ActiveList({
   orders,
   menuMap,
   tableMap,
+  zoneMap,
   locale,
   canAct,
   busyId,
@@ -533,6 +591,9 @@ function ActiveList({
               <div className="flex items-center gap-2">
                 <span className="rounded-md bg-ink px-2 py-0.5 text-xs font-semibold tabular-nums text-surface">
                   {tableMap.get(order.table_id)?.table_number ?? "?"}
+                </span>
+                <span className="rounded-md bg-canvas px-2 py-0.5 text-xs font-medium text-muted">
+                  {zoneMap.get(tableMap.get(order.table_id)?.zone_id ?? "")?.name ?? "ไม่ระบุโซน"}
                 </span>
                 <span className="text-xs text-muted">
                   {t("kit.col.table_at", { time: formatTime(order.created_at) })}
@@ -606,6 +667,7 @@ interface HistoryListProps {
   orders: Order[];
   menuMap: Map<string, Menu>;
   tableMap: Map<string, DiningTable>;
+  zoneMap: Map<string, TableZone>;
   locale: ReturnType<typeof useT>["locale"];
   memberEmails: Record<string, string>;
 }
@@ -614,6 +676,7 @@ function HistoryList({
   orders,
   menuMap,
   tableMap,
+  zoneMap,
   locale,
   memberEmails,
 }: HistoryListProps) {
@@ -641,6 +704,9 @@ function HistoryList({
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-md bg-ink px-2 py-0.5 text-xs font-semibold tabular-nums text-surface">
                   {tableMap.get(order.table_id)?.table_number ?? "?"}
+                </span>
+                <span className="rounded-md bg-canvas px-2 py-0.5 text-xs font-medium text-muted">
+                  {zoneMap.get(tableMap.get(order.table_id)?.zone_id ?? "")?.name ?? "ไม่ระบุโซน"}
                 </span>
                 <span className="text-xs text-muted">
                   {order.completed_at
