@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useT } from "./I18nProvider";
 import { LOCALE_FLAG, LOCALE_LABEL, LOCALES, type Locale } from "./types";
 
@@ -11,45 +11,35 @@ interface Props {
 export function LanguageSwitcher({ variant = "default" }: Props) {
   const { locale, setLocale, t } = useT();
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
   const usePopup = variant === "popup";
 
-  useEffect(() => {
-    function onClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    if (open) document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, [open]);
+  const buttonClass =
+    variant === "popup"
+      ? "flex h-10 items-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-xs font-semibold text-ink shadow-sm transition hover:border-ink/30 hover:bg-canvas"
+      : variant === "compact"
+        ? "flex h-8 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-xs font-medium text-ink transition hover:border-ink/30 hover:bg-canvas"
+        : "flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-xs font-medium text-ink transition hover:border-ink/30 hover:bg-canvas";
 
   return (
-    <div ref={ref} className="relative">
+    <div className="relative">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(true)}
         aria-label={t("lang.switch")}
-        className={
-          variant === "popup"
-            ? "flex h-10 items-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-xs font-semibold text-ink shadow-sm transition hover:border-ink/30 hover:bg-canvas"
-            : variant === "compact"
-            ? "flex h-8 items-center gap-1 rounded-lg border border-line bg-surface px-2 text-xs font-medium text-ink transition hover:border-ink/30 hover:bg-canvas"
-            : "flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-xs font-medium text-ink transition hover:border-ink/30 hover:bg-canvas"
-        }
+        className={buttonClass}
       >
-        <span aria-hidden="true">{usePopup ? "文" : LOCALE_FLAG[locale]}</span>
+        <span aria-hidden="true">{usePopup ? "A" : LOCALE_FLAG[locale]}</span>
         <span className={usePopup ? "inline" : "hidden sm:inline"}>
           {usePopup ? t("lang.label") : LOCALE_LABEL[locale]}
         </span>
         <span aria-hidden="true" className="text-muted">
-          ▾
+          v
         </span>
       </button>
 
-      {open && usePopup ? (
+      {open ? (
         <div
-          className="fixed inset-0 z-[80] flex items-end justify-center bg-ink/40 px-4 pb-4 sm:items-center sm:pb-0"
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-ink/40 px-4 pb-4 sm:items-center sm:pb-0"
           role="presentation"
           onClick={() => setOpen(false)}
         >
@@ -89,7 +79,7 @@ export function LanguageSwitcher({ variant = "default" }: Props) {
                     <span>{LOCALE_LABEL[l]}</span>
                     {l === locale ? (
                       <span aria-hidden="true" className="ml-auto text-ink">
-                        âœ“
+                        *
                       </span>
                     ) : null}
                   </button>
@@ -98,35 +88,6 @@ export function LanguageSwitcher({ variant = "default" }: Props) {
             </ul>
           </div>
         </div>
-      ) : open ? (
-        <ul
-          role="menu"
-          className="absolute right-0 top-full z-30 mt-1 min-w-[140px] overflow-hidden rounded-xl border border-line bg-surface shadow-lg"
-        >
-          {LOCALES.map((l: Locale) => (
-            <li key={l} role="none">
-              <button
-                role="menuitem"
-                type="button"
-                onClick={() => {
-                  setLocale(l);
-                  setOpen(false);
-                }}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition hover:bg-canvas ${
-                  l === locale ? "font-semibold text-ink" : "text-muted"
-                }`}
-              >
-                <span aria-hidden="true">{LOCALE_FLAG[l]}</span>
-                <span>{LOCALE_LABEL[l]}</span>
-                {l === locale ? (
-                  <span aria-hidden="true" className="ml-auto text-ink">
-                    ✓
-                  </span>
-                ) : null}
-              </button>
-            </li>
-          ))}
-        </ul>
       ) : null}
     </div>
   );
