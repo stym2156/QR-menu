@@ -22,7 +22,7 @@ export default async function CustomerMenuPage({ params }: { params: Params }) {
   ] = await Promise.all([
     supabase
       .from("tables")
-      .select("id, table_number, restaurant_id, is_open")
+      .select("id, table_number, restaurant_id, is_open, zone_id, table_zones(name)")
       .eq("id", tableId)
       .eq("restaurant_id", restaurantId)
       .maybeSingle(),
@@ -56,6 +56,11 @@ export default async function CustomerMenuPage({ params }: { params: Params }) {
   if (!table || !restaurant) notFound();
 
   const tableIsOpen = (table as { is_open?: boolean }).is_open ?? false;
+  const zoneName =
+    (table as { table_zones?: { name?: string } | { name?: string }[] | null })
+      .table_zones instanceof Array
+      ? (table as { table_zones?: { name?: string }[] }).table_zones?.[0]?.name ?? null
+      : (table as { table_zones?: { name?: string } | null }).table_zones?.name ?? null;
   const shopStatus = getShopStatus({
     accepting_orders: restaurant.accepting_orders ?? true,
     open_time: restaurant.open_time ?? null,
@@ -68,6 +73,7 @@ export default async function CustomerMenuPage({ params }: { params: Params }) {
       <CustomerHeader
         restaurantName={restaurant.name}
         tableNumber={table.table_number}
+        zoneName={zoneName}
         shopIsOpen={shopStatus.isOpen}
         openTime={shopStatus.openTime ?? null}
         closeTime={shopStatus.closeTime ?? null}

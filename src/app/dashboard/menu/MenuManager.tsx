@@ -381,6 +381,9 @@ export default function MenuManager({
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
             </div>
+            <p className="mt-2 text-[11px] leading-relaxed text-muted">
+              แนะนำรูปสี่เหลี่ยมจัตุรัส 1200 x 1200 px (อย่างน้อย 800 x 800 px), JPG/PNG. หน้าลูกค้าจะแสดงเป็นกรอบ 1:1 และครอปพอดี.
+            </p>
           </FormField>
 
          
@@ -865,6 +868,9 @@ function MenuEditModal({ menu, onSave, onClose }: MenuEditModalProps) {
                 />
               </label>
             )}
+            <p className="mt-2 text-[11px] leading-relaxed text-muted">
+              แนะนำรูปสี่เหลี่ยมจัตุรัส 1200 x 1200 px (อย่างน้อย 800 x 800 px), JPG/PNG. หน้าลูกค้าจะแสดงเป็นกรอบ 1:1.
+            </p>
           </FormField>
           <FormField label={t("mgr.menu.price")}>
             <div className="relative rounded-xl">

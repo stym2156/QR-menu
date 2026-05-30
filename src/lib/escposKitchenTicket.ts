@@ -66,6 +66,7 @@ interface BuildKitchenTicketInput {
   order: Order;
   menus: Menu[];
   tableNumber: number;
+  zoneName?: string | null;
   widthMm: number;
   locale?: Locale;
   // Optional label printed at the top — usually short order id or "REPRINT".
@@ -112,6 +113,11 @@ export function buildKitchenTicketBytes(
   push(ALIGN_LEFT);
   line(rule("=", cols));
   push(ALIGN_CENTER);
+  if (input.zoneName) {
+    push(BOLD_ON);
+    line(input.zoneName);
+    push(BOLD_OFF);
+  }
   push(SIZE_TRIPLE_W);
   push(BOLD_ON);
   line(t("kit.ticket.table", { n: input.tableNumber }));

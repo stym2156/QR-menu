@@ -18,6 +18,7 @@ interface PrintKitchenTicketInput {
   order: Order;
   menus: Menu[];
   tableNumber: number;
+  zoneName?: string | null;
   // 58 / 76 / 80. Drives the @page width hint. Anything ≥ 100 falls into
   // the auto-A4 branch via CSS media query (same trick as receipt.ts).
   widthMm: number;
@@ -109,6 +110,7 @@ function renderHTML(input: PrintKitchenTicketInput): string {
 
   const shortId = input.order.id.slice(-4).toUpperCase();
   const tableLine = t("kit.ticket.table", { n: input.tableNumber });
+  const zoneLine = input.zoneName?.trim() || null;
   const summaryLine = t("kit.ticket.summary", {
     items: lineCount,
     qty: totalQty,
@@ -141,6 +143,15 @@ function renderHTML(input: PrintKitchenTicketInput): string {
     border: 1px dashed #000;
   }
   .header { text-align: center; }
+  .zone {
+    display: inline-block;
+    border: 1px solid #000;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
   h1 {
     font-size: 28px;
     margin: 4px 0;
@@ -186,6 +197,7 @@ function renderHTML(input: PrintKitchenTicketInput): string {
       line-height: 1.5;
     }
     .badge { font-size: 12pt; padding: 4pt 0; margin-bottom: 12pt; }
+    .zone { font-size: 13pt; padding: 3pt 10pt; margin-bottom: 6pt; }
     h1 { font-size: 36pt; margin: 12pt 0 4pt; }
     .sub { font-size: 13pt; margin-bottom: 12pt; }
     .rule, .double-rule { margin: 12pt 0; }
@@ -202,6 +214,7 @@ function renderHTML(input: PrintKitchenTicketInput): string {
 <body>
   ${input.badge ? `<div class="badge">** ${escape(input.badge)} **</div>` : ""}
   <div class="header">
+    ${zoneLine ? `<div class="zone">${escape(zoneLine)}</div>` : ""}
     <h1>${escape(tableLine)}</h1>
     <div class="sub">#${escape(shortId)} · ${escape(formatDateTime(input.order.created_at))}</div>
   </div>

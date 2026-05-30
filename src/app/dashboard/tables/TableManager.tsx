@@ -278,7 +278,7 @@ export default function TableManager({
     const zone = zoneMap.get(table.zone_id);
     const dataUrl = await qrWithLabel({
       url,
-      label: zone ? `${zone.name} / ${table.table_number}` : String(table.table_number),
+      label: String(table.table_number),
       size: 600,
     });
     const link = document.createElement("a");
@@ -571,7 +571,7 @@ function TableCard({
     let cancelled = false;
     void qrWithLabel({
       url,
-      label: zone ? `${zone.name} / ${table.table_number}` : String(table.table_number),
+      label: String(table.table_number),
       size: 240,
       margin: 1,
     }).then((src) => {

@@ -6,6 +6,7 @@ import { LanguageSwitcher } from "@/lib/i18n/LanguageSwitcher";
 interface Props {
   restaurantName: string;
   tableNumber: number;
+  zoneName: string | null;
   shopIsOpen: boolean;
   openTime: string | null;
   closeTime: string | null;
@@ -16,6 +17,7 @@ interface Props {
 export default function CustomerHeader({
   restaurantName,
   tableNumber,
+  zoneName,
   shopIsOpen,
   openTime,
   closeTime,
@@ -41,15 +43,20 @@ export default function CustomerHeader({
             ) : null}
           </div>
           <div className="flex shrink-0 items-start gap-2">
-            <LanguageSwitcher variant="compact" />
             <div className="rounded-xl bg-canvas px-3 py-2 text-right">
+              {zoneName ? (
+                <div className="max-w-24 truncate text-[11px] font-medium text-muted">
+                  {zoneName}
+                </div>
+              ) : null}
               <div className="text-[10px] font-medium tracking-[0.14em] text-muted">
                 {t("cust.table_label")}
               </div>
-              <div className="mt-0.5 text-xl font-semibold tabular-nums tracking-tight text-ink">
+              <div className="mt-0.5 text-2xl font-semibold tabular-nums tracking-tight text-ink">
                 {tableNumber}
               </div>
             </div>
+            <LanguageSwitcher variant="compact" />
           </div>
         </div>
       </header>

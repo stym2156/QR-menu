@@ -59,6 +59,11 @@ export default function KitchenDisplay({
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
   const tableMap = useMemo(() => new Map(tables.map((t) => [t.id, t])), [tables]);
   const zoneMap = useMemo(() => new Map(zones.map((z) => [z.id, z])), [zones]);
+  const zoneNameForTable = useCallback(
+    (table: DiningTable | undefined): string | null =>
+      table ? zoneMap.get(table.zone_id)?.name ?? null : null,
+    [zoneMap],
+  );
 
   // Keep refs in sync — the realtime callback below captures them at subscribe
   // time, so we use refs to read the latest values.
@@ -129,6 +134,7 @@ export default function KitchenDisplay({
     async (order: Order) => {
       const table = tableMap.get(order.table_id);
       const tableNumber = table?.table_number ?? 0;
+      const zoneName = zoneNameForTable(table);
       const hasDirect = getActivePrinter() !== null;
 
       // Path 1: direct BT/USB printer wins when available + auto-print toggle on.
@@ -137,6 +143,7 @@ export default function KitchenDisplay({
           order,
           menus,
           tableNumber,
+          zoneName,
           widthMm: kitchenPrintWidth,
           locale: locale as Locale,
         });
@@ -167,13 +174,14 @@ export default function KitchenDisplay({
           order,
           menus,
           tableNumber,
+          zoneName,
           widthMm: kitchenPrintWidth,
           locale: locale as Locale,
         });
         await completeOrder(order, { silent: true });
       }
     },
-    [tableMap, menus, kitchenPrintWidth, locale, toast, t, completeOrder],
+    [tableMap, zoneNameForTable, menus, kitchenPrintWidth, locale, toast, t, completeOrder],
   );
 
   useKitchenRealtime({
@@ -190,6 +198,7 @@ export default function KitchenDisplay({
   async function printActiveOrder(order: Order): Promise<void> {
     const table = tableMap.get(order.table_id);
     const tableNumber = table?.table_number ?? 0;
+    const zoneName = zoneNameForTable(table);
     const hasDirect = getActivePrinter() !== null;
 
     if (hasDirect) {
@@ -198,6 +207,7 @@ export default function KitchenDisplay({
         order,
         menus,
         tableNumber,
+        zoneName,
         widthMm: kitchenPrintWidth,
         locale: locale as Locale,
       });
@@ -218,6 +228,7 @@ export default function KitchenDisplay({
         order,
         menus,
         tableNumber,
+        zoneName,
         widthMm: kitchenPrintWidth,
         locale: locale as Locale,
       });
