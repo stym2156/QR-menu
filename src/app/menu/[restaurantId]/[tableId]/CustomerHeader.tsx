@@ -56,7 +56,7 @@ export default function CustomerHeader({
                 {tableNumber}
               </div>
             </div>
-            <LanguageSwitcher variant="compact" />
+            <LanguageSwitcher variant="popup" />
           </div>
         </div>
       </header>
