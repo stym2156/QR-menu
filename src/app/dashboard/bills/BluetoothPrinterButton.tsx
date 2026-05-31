@@ -18,6 +18,7 @@ import type { Locale } from "@/lib/i18n/types";
 interface PrintArgs {
   restaurantName: string;
   tableNumber: number;
+  zoneName?: string | null;
   orders: Order[];
   menus: Menu[];
   method: PaymentMethod;

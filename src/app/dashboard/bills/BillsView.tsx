@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatKIP, formatTime } from "@/lib/format";
 import { EmptyState, buttonSecondary } from "@/components/ui";
@@ -17,6 +17,7 @@ import type {
   Menu,
   Order,
   PaymentMethod,
+  TableZone,
 } from "@/lib/types";
 
 type Tab = "unpaid" | "settled";
@@ -30,6 +31,7 @@ interface Props {
   initialOrders: Order[];
   initialSettledOrders: Order[];
   tables: DiningTable[];
+  zones: TableZone[];
   menus: Menu[];
   initialCalls: CallStaffRequest[];
   canAct: boolean;
@@ -44,6 +46,7 @@ export default function BillsView({
   initialOrders,
   initialSettledOrders,
   tables,
+  zones,
   menus,
   initialCalls,
   canAct,
@@ -64,7 +67,13 @@ export default function BillsView({
   } | null>(null);
 
   const tableMap = useMemo(() => new Map(tables.map((t) => [t.id, t])), [tables]);
+  const zoneMap = useMemo(() => new Map(zones.map((z) => [z.id, z])), [zones]);
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
+  const zoneNameForTable = useCallback(
+    (table: DiningTable | undefined): string | null =>
+      table ? zoneMap.get(table.zone_id)?.name ?? null : null,
+    [zoneMap],
+  );
 
   const byTable = useMemo<BillGroup[]>(() => {
     const groups = new Map<string, Order[]>();
@@ -77,6 +86,7 @@ export default function BillsView({
       .map<BillGroup>(([tableId, list]) => ({
         tableId,
         table: tableMap.get(tableId),
+        zoneName: zoneNameForTable(tableMap.get(tableId)),
         orders: list,
         total: list.reduce((s, o) => s + Number(o.total), 0),
         itemCount: list.reduce(
@@ -88,7 +98,7 @@ export default function BillsView({
       .sort(
         (a, b) => (a.table?.table_number ?? 0) - (b.table?.table_number ?? 0),
       );
-  }, [orders, tableMap]);
+  }, [orders, tableMap, zoneNameForTable]);
 
   const grandTotal = byTable.reduce((s, g) => s + g.total, 0);
 
@@ -243,6 +253,7 @@ export default function BillsView({
       targetId: tableId,
       details: {
         table_number: tableMap.get(tableId)?.table_number ?? null,
+        zone_name: zoneNameForTable(tableMap.get(tableId)),
         order_ids: ids,
         method,
         total: totalSettled,
@@ -275,6 +286,7 @@ export default function BillsView({
     printReceipt({
       restaurantName,
       tableNumber: lastSettled.table.table_number,
+      zoneName: zoneNameForTable(lastSettled.table),
       orders: lastSettled.orders,
       menus,
       method: lastSettled.method,
@@ -352,6 +364,7 @@ export default function BillsView({
                 job={{
                   restaurantName,
                   tableNumber: lastSettled.table.table_number,
+                  zoneName: zoneNameForTable(lastSettled.table),
                   orders: lastSettled.orders,
                   menus,
                   method: lastSettled.method,
@@ -429,6 +442,7 @@ export default function BillsView({
                         {group.table?.table_number}
                       </span>
                       <div className="text-xs text-muted">
+                        {group.zoneName ? <div>{group.zoneName}</div> : null}
                         <div>{t("bill.unpaid.orders_n", { n: group.orders.length })}</div>
                         <div>{t("bill.unpaid.items_n", { n: group.itemCount })}</div>
                       </div>
@@ -452,6 +466,7 @@ export default function BillsView({
         <SettledBills
           settledOrders={settledOrders}
           tables={tables}
+          zones={zones}
           menus={menus}
           restaurantName={restaurantName}
           serviceChargePct={serviceChargePct}

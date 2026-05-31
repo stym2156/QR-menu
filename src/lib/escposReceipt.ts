@@ -93,6 +93,7 @@ function rule(char: string, width = WIDTH_NORMAL): string {
 interface BuildReceiptInput {
   restaurantName: string;
   tableNumber: number;
+  zoneName?: string | null;
   orders: Order[];
   menus: Menu[];
   method: PaymentMethod;
@@ -140,6 +141,9 @@ export function buildReceiptBytes(input: BuildReceiptInput): Uint8Array {
   push(BOLD_OFF);
   push(SIZE_NORMAL);
   line(t("receipt.table_n", { n: input.tableNumber }));
+  if (input.zoneName) {
+    line(input.zoneName);
+  }
   const date = new Date(input.paidAt).toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",

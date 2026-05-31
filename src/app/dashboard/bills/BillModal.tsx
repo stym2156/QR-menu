@@ -11,6 +11,7 @@ import type { DiningTable, Menu, Order, PaymentMethod } from "@/lib/types";
 export interface BillGroup {
   tableId: string;
   table: DiningTable | undefined;
+  zoneName: string | null;
   orders: Order[];
   total: number;
   itemCount: number;
@@ -73,9 +74,14 @@ export function BillModal({
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-ink text-sm font-semibold tabular-nums text-surface">
               {group.table?.table_number}
             </span>
-            <h3 className="text-base font-semibold tracking-tight text-ink">
-              {t("bill.modal.title", { n: group.table?.table_number ?? "?" })}
-            </h3>
+            <div>
+              <h3 className="text-base font-semibold tracking-tight text-ink">
+                {t("bill.modal.title", { n: group.table?.table_number ?? "?" })}
+              </h3>
+              {group.zoneName ? (
+                <div className="text-xs text-muted">{group.zoneName}</div>
+              ) : null}
+            </div>
           </div>
           <button
             onClick={onClose}

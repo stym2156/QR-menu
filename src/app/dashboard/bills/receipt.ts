@@ -25,6 +25,7 @@ function makeTranslator(locale: Locale): Translate {
 interface PrintReceiptInput {
   restaurantName: string;
   tableNumber: number;
+  zoneName?: string | null;
   orders: Order[];
   menus: Menu[];
   method: PaymentMethod;
@@ -282,6 +283,7 @@ function renderHTML(input: RenderInput): string {
     <h1>${escape(input.restaurantName)}</h1>
     <div class="meta">
       ${escape(t("receipt.table_n", { n: input.tableNumber }))}<br/>
+      ${input.zoneName ? `${escape(input.zoneName)}<br/>` : ""}
       ${escape(date)} · ${escape(time)}
     </div>
   </div>

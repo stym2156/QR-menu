@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { formatKIP, formatTime } from "@/lib/format";
 import { EmptyState, buttonSecondary } from "@/components/ui";
 import { useT } from "@/lib/i18n/I18nProvider";
@@ -12,6 +12,7 @@ import type {
   Menu,
   Order,
   PaymentMethod,
+  TableZone,
 } from "@/lib/types";
 
 type RangeKey = "today" | "yesterday" | "7d" | "30d";
@@ -44,6 +45,7 @@ interface SettledBill {
 interface Props {
   settledOrders: Order[];
   tables: DiningTable[];
+  zones: TableZone[];
   menus: Menu[];
   restaurantName: string;
   serviceChargePct: number;
@@ -81,6 +83,7 @@ function rangeBounds(range: RangeKey): { start: number; end: number } {
 export default function SettledBills({
   settledOrders,
   tables,
+  zones,
   menus,
   restaurantName,
   serviceChargePct,
@@ -94,6 +97,12 @@ export default function SettledBills({
   const tableMap = useMemo(
     () => new Map(tables.map((t) => [t.id, t])),
     [tables],
+  );
+  const zoneMap = useMemo(() => new Map(zones.map((z) => [z.id, z])), [zones]);
+  const zoneNameForTable = useCallback(
+    (table: DiningTable | undefined): string | null =>
+      table ? zoneMap.get(table.zone_id)?.name ?? null : null,
+    [zoneMap],
   );
   const menuMap = useMemo(() => new Map(menus.map((m) => [m.id, m])), [menus]);
 
@@ -147,6 +156,7 @@ export default function SettledBills({
     printReceipt({
       restaurantName,
       tableNumber: bill.table.table_number,
+      zoneName: zoneNameForTable(bill.table),
       orders: bill.orders,
       menus,
       method: bill.method,
@@ -227,6 +237,12 @@ export default function SettledBills({
                       </span>
                     </div>
                     <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted">
+                      {zoneNameForTable(bill.table) ? (
+                        <>
+                          <span>{zoneNameForTable(bill.table)}</span>
+                          <span>Â·</span>
+                        </>
+                      ) : null}
                       <span>{formatBillDateTime(bill.paidAt, t)}</span>
                       <span>·</span>
                       <span>
@@ -279,6 +295,7 @@ export default function SettledBills({
                           job={{
                             restaurantName,
                             tableNumber: bill.table.table_number,
+                            zoneName: zoneNameForTable(bill.table),
                             orders: bill.orders,
                             menus,
                             method: bill.method,

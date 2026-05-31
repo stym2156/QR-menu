@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { canActBills, canSeeBills, getCurrentMembership } from "@/lib/membership";
 import BillsView from "./BillsView";
 import I18nPageHeader from "@/components/I18nPageHeader";
-import type { CallStaffRequest, DiningTable, Menu, Order } from "@/lib/types";
+import type { CallStaffRequest, DiningTable, Menu, Order, TableZone } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +41,7 @@ export default async function BillsPage() {
     { data: orders },
     { data: settledOrders },
     { data: tables },
+    { data: zones },
     { data: menus },
     { data: calls },
   ] = await Promise.all([
@@ -63,6 +64,12 @@ export default async function BillsPage() {
       .select("*")
       .eq("restaurant_id", restaurant.id)
       .order("table_number", { ascending: true }),
+    supabase
+      .from("table_zones")
+      .select("*")
+      .eq("restaurant_id", restaurant.id)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true }),
     supabase.from("menus").select("*").eq("restaurant_id", restaurant.id),
     supabase
       .from("call_staff_requests")
@@ -84,6 +91,7 @@ export default async function BillsPage() {
         initialOrders={(orders ?? []) as Order[]}
         initialSettledOrders={(settledOrders ?? []) as Order[]}
         tables={(tables ?? []) as DiningTable[]}
+        zones={(zones ?? []) as TableZone[]}
         menus={(menus ?? []) as Menu[]}
         initialCalls={(calls ?? []) as CallStaffRequest[]}
         canAct={canActBills(membership.role)}
