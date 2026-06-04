@@ -16,8 +16,7 @@ import {
 import CategoryCombobox from "@/components/CategoryCombobox";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/toast";
-import { compressImage } from "@/lib/image";
-import { randomId } from "@/lib/uuid";
+import { uploadPublicImage } from "@/lib/storage/images";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { pickName } from "@/lib/i18n/localized";
 import type { Category, Menu } from "@/lib/types";
@@ -138,21 +137,18 @@ export default function MenuManager({
     let imageUrl: string | null = null;
 
     if (file) {
-      const compressed = await compressImage(file).catch(() => file);
-      const ext = compressed.name.split(".").pop() ?? "jpg";
-      const path = `${restaurantId}/${randomId()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("menu-images")
-        .upload(path, compressed, { cacheControl: "3600", upsert: false });
+      const uploaded = await uploadPublicImage(supabase, {
+        bucket: "menu-images",
+        ownerId: restaurantId,
+        file,
+      });
 
-      if (uploadError) {
-        setError(t("mgr.menu.upload_failed", { error: uploadError.message }));
+      if ("error" in uploaded) {
+        setError(t("mgr.menu.upload_failed", { error: uploaded.error }));
         setBusy(false);
         return;
       }
-
-      const { data: publicUrl } = supabase.storage.from("menu-images").getPublicUrl(path);
-      imageUrl = publicUrl.publicUrl;
+      imageUrl = uploaded.publicUrl;
     }
 
     // `name` is NOT NULL in the schema — fall back to whichever language is filled.
@@ -227,22 +223,16 @@ export default function MenuManager({
     if (next.removeImage) {
       nextImageUrl = null;
     } else if (next.imageFile) {
-      const compressed = await compressImage(next.imageFile).catch(
-        () => next.imageFile!,
-      );
-      const ext = compressed.name.split(".").pop() ?? "jpg";
-      const path = `${restaurantId}/${randomId()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("menu-images")
-        .upload(path, compressed, { cacheControl: "3600", upsert: false });
-      if (uploadError) {
-        toast.error(t("mgr.menu.upload_failed", { error: uploadError.message }));
+      const uploaded = await uploadPublicImage(supabase, {
+        bucket: "menu-images",
+        ownerId: restaurantId,
+        file: next.imageFile,
+      });
+      if ("error" in uploaded) {
+        toast.error(t("mgr.menu.upload_failed", { error: uploaded.error }));
         return false;
       }
-      const { data: publicUrl } = supabase.storage
-        .from("menu-images")
-        .getPublicUrl(path);
-      nextImageUrl = publicUrl.publicUrl;
+      nextImageUrl = uploaded.publicUrl;
     }
 
     const patch = {

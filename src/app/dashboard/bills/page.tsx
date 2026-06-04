@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
-import NoShopMessage from "@/components/NoShopMessage";
-import { createClient } from "@/lib/supabase/server";
-import { canActBills, canSeeBills, getCurrentMembership } from "@/lib/membership";
+import { canActBills, canSeeBills } from "@/lib/membership";
+import { requireDashboardSession } from "@/server/auth";
 import BillsView from "./BillsView";
 import I18nPageHeader from "@/components/I18nPageHeader";
 import type { CallStaffRequest, DiningTable, Menu, Order, TableZone } from "@/lib/types";
@@ -9,17 +8,7 @@ import type { CallStaffRequest, DiningTable, Menu, Order, TableZone } from "@/li
 export const dynamic = "force-dynamic";
 
 export default async function BillsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const membership = await getCurrentMembership(supabase);
-  if (!membership) {
-    return <p className="text-muted">ยังไม่มีร้าน — กรุณา signup ใหม่</p>;
-  }
+  const { supabase, membership } = await requireDashboardSession();
   if (!canSeeBills(membership.role)) redirect("/dashboard");
 
   const { data: restaurant } = await supabase
@@ -32,7 +21,7 @@ export default async function BillsPage() {
     return <p className="text-muted">ไม่พบข้อมูลร้าน</p>;
   }
 
-  // Settled-bills history window — 30 days back is plenty for the bills view
+  // Settled-bills history window - 30 days back is plenty for the bills view
   // (older history lives on the stats page).
   const since = new Date();
   since.setDate(since.getDate() - 30);

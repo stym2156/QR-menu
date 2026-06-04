@@ -1,12 +1,10 @@
 import { redirect } from "next/navigation";
-import NoShopMessage from "@/components/NoShopMessage";
-import { createClient } from "@/lib/supabase/server";
 import {
   canActTables,
   canManageTables,
   canSeeTables,
-  getCurrentMembership,
 } from "@/lib/membership";
+import { requireDashboardSession } from "@/server/auth";
 import TableManager from "./TableManager";
 import I18nPageHeader from "@/components/I18nPageHeader";
 import type { DiningTable, TableZone } from "@/lib/types";
@@ -14,17 +12,7 @@ import type { DiningTable, TableZone } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 export default async function TablesPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const membership = await getCurrentMembership(supabase);
-  if (!membership) {
-    return <p className="text-muted">ยังไม่มีร้าน — กรุณา signup ใหม่</p>;
-  }
+  const { supabase, membership } = await requireDashboardSession();
   if (!canSeeTables(membership.role)) redirect("/dashboard");
 
   const [{ data: tables }, { data: zones }] = await Promise.all([

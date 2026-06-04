@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { canActKitchen, canSeeKitchen, getCurrentMembership } from "@/lib/membership";
+import { canActKitchen, canSeeKitchen } from "@/lib/membership";
+import { requireDashboardSession } from "@/server/auth";
 import KitchenDisplay from "./KitchenDisplay";
 import I18nPageHeader from "@/components/I18nPageHeader";
 import type { DiningTable, Menu, Order, TableZone } from "@/lib/types";
@@ -8,19 +8,8 @@ import type { DiningTable, Menu, Order, TableZone } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 export default async function KitchenPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const membership = await getCurrentMembership(supabase);
-  if (!membership) {
-    return <p className="text-muted">ยังไม่มีร้าน — กรุณา signup ใหม่</p>;
-  }
+  const { supabase, membership } = await requireDashboardSession();
   if (!canSeeKitchen(membership.role)) redirect("/dashboard");
-  const restaurant = { id: membership.restaurantId };
 
   // Pull 7-day completion history window. Older than that lives on /stats.
   const since = new Date();
@@ -38,30 +27,30 @@ export default async function KitchenPage() {
     supabase
       .from("orders")
       .select("*")
-      .eq("restaurant_id", restaurant.id)
+      .eq("restaurant_id", membership.restaurantId)
       .in("status", ["pending", "ready"])
       .order("created_at", { ascending: true }),
     supabase
       .from("orders")
       .select("*")
-      .eq("restaurant_id", restaurant.id)
+      .eq("restaurant_id", membership.restaurantId)
       .in("status", ["served", "cancelled"])
       .gte("completed_at", since.toISOString())
       .order("completed_at", { ascending: false })
       .limit(100),
-    supabase.from("menus").select("*").eq("restaurant_id", restaurant.id),
-    supabase.from("tables").select("*").eq("restaurant_id", restaurant.id),
+    supabase.from("menus").select("*").eq("restaurant_id", membership.restaurantId),
+    supabase.from("tables").select("*").eq("restaurant_id", membership.restaurantId),
     supabase
       .from("table_zones")
       .select("*")
-      .eq("restaurant_id", restaurant.id)
+      .eq("restaurant_id", membership.restaurantId)
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),
-    supabase.rpc("lookup_member_emails", { rid: restaurant.id }),
+    supabase.rpc("lookup_member_emails", { rid: membership.restaurantId }),
     supabase
       .from("restaurants")
       .select("name, kitchen_print_width")
-      .eq("id", restaurant.id)
+      .eq("id", membership.restaurantId)
       .maybeSingle(),
   ]);
 
@@ -74,7 +63,7 @@ export default async function KitchenPage() {
     <div>
       <I18nPageHeader titleKey="page.kitchen.title" descKey="page.kitchen.desc" />
       <KitchenDisplay
-        restaurantId={restaurant.id}
+        restaurantId={membership.restaurantId}
         initialOrders={(orders ?? []) as Order[]}
         initialHistory={(history ?? []) as Order[]}
         menus={(menus ?? []) as Menu[]}

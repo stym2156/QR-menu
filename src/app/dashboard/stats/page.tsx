@@ -1,24 +1,13 @@
 import { redirect } from "next/navigation";
-import NoShopMessage from "@/components/NoShopMessage";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentMembership, isOwner } from "@/lib/membership";
+import { isOwner } from "@/lib/membership";
+import { requireDashboardSession } from "@/server/auth";
 import StatsView from "./StatsView";
 import type { Category, DiningTable, Menu, Order, TableZone } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function StatsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const membership = await getCurrentMembership(supabase);
-  if (!membership) {
-    return <p className="text-muted">ยังไม่มีร้าน — กรุณา signup ใหม่</p>;
-  }
+  const { supabase, membership } = await requireDashboardSession();
   if (!isOwner(membership.role)) redirect("/dashboard");
 
   const since = new Date();

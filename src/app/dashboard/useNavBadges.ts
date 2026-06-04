@@ -21,25 +21,24 @@ export function useNavBadges(restaurantId: string | null): NavBadges {
     let cancelled = false;
 
     async function loadOrders(): Promise<void> {
-      const { data } = await supabase
-        .from("orders")
-        .select("table_id, status, paid")
-        .eq("restaurant_id", restaurantId);
+      const [{ count: pending }, { data: unpaidRows }] = await Promise.all([
+        supabase
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .eq("restaurant_id", restaurantId)
+          .in("status", ["pending", "ready"]),
+        supabase
+          .from("orders")
+          .select("table_id")
+          .eq("restaurant_id", restaurantId)
+          .eq("paid", false)
+          .neq("status", "cancelled"),
+      ]);
       if (cancelled) return;
-      const rows = (data ?? []) as Array<{
-        table_id: string;
-        status: string;
-        paid: boolean;
-      }>;
-      const pending = rows.filter(
-        (o) => o.status === "pending" || o.status === "ready",
-      ).length;
       const unpaid = new Set(
-        rows
-          .filter((o) => !o.paid && o.status !== "cancelled")
-          .map((o) => o.table_id),
+        ((unpaidRows ?? []) as Array<{ table_id: string }>).map((o) => o.table_id),
       ).size;
-      setPendingOrders(pending);
+      setPendingOrders(pending ?? 0);
       setUnpaidTables(unpaid);
     }
 

@@ -14,8 +14,7 @@ import {
 } from "@/components/ui";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useToast } from "@/components/toast";
-import { compressImage } from "@/lib/image";
-import { randomId } from "@/lib/uuid";
+import { uploadPublicImage } from "@/lib/storage/images";
 import { useT } from "@/lib/i18n/I18nProvider";
 import type { Promotion } from "@/lib/types";
 
@@ -45,22 +44,17 @@ export default function PromotionManager({
 
   async function uploadImage(): Promise<string | null> {
     if (!file) return null;
-    const compressed = await compressImage(file).catch(() => file);
-    const ext = compressed.name.split(".").pop() ?? "jpg";
-    const path = `${restaurantId}/${randomId()}.${ext}`;
-    const { error: uploadError } = await supabase.storage
-      .from("promotion-images")
-      .upload(path, compressed, { cacheControl: "3600", upsert: false });
+    const uploaded = await uploadPublicImage(supabase, {
+      bucket: "promotion-images",
+      ownerId: restaurantId,
+      file,
+    });
 
-    if (uploadError) {
-      setError(t("promo.upload_failed", { error: uploadError.message }));
+    if ("error" in uploaded) {
+      setError(t("promo.upload_failed", { error: uploaded.error }));
       return null;
     }
-
-    const { data: publicUrl } = supabase.storage
-      .from("promotion-images")
-      .getPublicUrl(path);
-    return publicUrl.publicUrl;
+    return uploaded.publicUrl;
   }
 
   async function handleAdd(e: React.FormEvent): Promise<void> {

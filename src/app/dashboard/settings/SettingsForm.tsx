@@ -14,8 +14,7 @@ import {
 } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { PasswordInput } from "@/components/PasswordInput";
-import { compressImage } from "@/lib/image";
-import { randomId } from "@/lib/uuid";
+import { uploadPublicImage } from "@/lib/storage/images";
 import { useT } from "@/lib/i18n/I18nProvider";
 import type { Restaurant } from "@/lib/types";
 
@@ -57,22 +56,17 @@ export default function SettingsForm({ restaurant, userEmail }: Props) {
   async function handleQrUpload(file: File): Promise<void> {
     setUploadingQr(true);
     try {
-      const compressed = await compressImage(file, { maxDimension: 800 }).catch(
-        () => file,
-      );
-      const ext = compressed.name.split(".").pop() ?? "png";
-      const path = `${restaurant.id}/${randomId()}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("payment-qr")
-        .upload(path, compressed, { cacheControl: "3600", upsert: false });
-      if (uploadError) {
-        toast.error(t("set.qr.upload_failed", { error: uploadError.message }));
+      const uploaded = await uploadPublicImage(supabase, {
+        bucket: "payment-qr",
+        ownerId: restaurant.id,
+        file,
+        maxDimension: 800,
+      });
+      if ("error" in uploaded) {
+        toast.error(t("set.qr.upload_failed", { error: uploaded.error }));
         return;
       }
-      const { data: pub } = supabase.storage
-        .from("payment-qr")
-        .getPublicUrl(path);
-      const url = pub.publicUrl;
+      const url = uploaded.publicUrl;
       const { error: dbError } = await supabase
         .from("restaurants")
         .update({ payment_qr_url: url })

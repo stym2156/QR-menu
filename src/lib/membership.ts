@@ -77,16 +77,21 @@ export interface Membership {
 
 export async function getCurrentMembership(
   supabase: SupabaseClient,
+  userId?: string,
 ): Promise<Membership | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  let resolvedUserId = userId;
+  if (!resolvedUserId) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    resolvedUserId = user?.id;
+  }
+  if (!resolvedUserId) return null;
 
   const { data } = await supabase
     .from("restaurant_members")
     .select("restaurant_id, role")
-    .eq("user_id", user.id)
+    .eq("user_id", resolvedUserId)
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();

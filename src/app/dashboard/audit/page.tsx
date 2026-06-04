@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import NoShopMessage from "@/components/NoShopMessage";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentMembership, isOwner } from "@/lib/membership";
+import { isOwner } from "@/lib/membership";
+import { requireDashboardSession } from "@/server/auth";
 import AuditView, { type AuditLogRow } from "./AuditView";
 
 export const dynamic = "force-dynamic";
@@ -9,13 +9,7 @@ export const dynamic = "force-dynamic";
 const PAGE_SIZE = 200;
 
 export default async function AuditPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const membership = await getCurrentMembership(supabase);
+  const { supabase, membership } = await requireDashboardSession();
   if (!membership) return <NoShopMessage />;
   if (!isOwner(membership.role)) redirect("/dashboard");
 

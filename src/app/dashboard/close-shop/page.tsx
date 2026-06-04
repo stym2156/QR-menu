@@ -1,23 +1,13 @@
 import { redirect } from "next/navigation";
-import NoShopMessage from "@/components/NoShopMessage";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentMembership, isOwner } from "@/lib/membership";
+import { isOwner } from "@/lib/membership";
+import { requireDashboardSession } from "@/server/auth";
 import CloseShopView from "./CloseShopView";
 import type { Menu, Order } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function CloseShopPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const membership = await getCurrentMembership(supabase);
-  if (!membership) {
-    return <NoShopMessage />;
-  }
+  const { supabase, membership } = await requireDashboardSession();
   if (!isOwner(membership.role)) redirect("/dashboard");
 
   // Default scope: orders from the last 14 days. Client narrows from there

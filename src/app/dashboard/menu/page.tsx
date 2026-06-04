@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { canSeeMenu, getCurrentMembership, isOwner } from "@/lib/membership";
+import { canSeeMenu, isOwner } from "@/lib/membership";
 import { getShopStatus } from "@/lib/hours";
+import { requireDashboardSession } from "@/server/auth";
 import MenuManager from "./MenuManager";
 import MenuPageHeaderClient from "./MenuPageHeaderClient";
 import StaffOrderHelper from "./StaffOrderHelper";
@@ -16,17 +16,7 @@ import type {
 export const dynamic = "force-dynamic";
 
 export default async function MenuPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const membership = await getCurrentMembership(supabase);
-  if (!membership) {
-    return <p className="text-muted">ยังไม่มีร้าน — กรุณา signup ใหม่</p>;
-  }
+  const { supabase, membership } = await requireDashboardSession();
   if (!canSeeMenu(membership.role)) redirect("/dashboard");
 
   const role = membership.role;

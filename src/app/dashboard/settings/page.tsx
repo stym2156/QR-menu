@@ -1,7 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
-import NoShopMessage from "@/components/NoShopMessage";
 import { redirect } from "next/navigation";
-import { getCurrentMembership } from "@/lib/membership";
+import { requireDashboardSession } from "@/server/auth";
 import SettingsForm from "./SettingsForm";
 import StaffManager from "./StaffManager";
 import I18nPageHeader from "@/components/I18nPageHeader";
@@ -20,32 +18,25 @@ interface StaffMember {
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) return null;
-
-  const membership = await getCurrentMembership(supabase);
-  if (!membership) return null;
+  const { supabase, user, membership } = await requireDashboardSession();
   if (membership.role !== "owner") redirect("/dashboard/kitchen");
 
-  const { data: restaurant } = await supabase
-    .from("restaurants")
-    .select("*")
-    .eq("id", membership.restaurantId)
-    .maybeSingle();
+  const [{ data: restaurant }, { data: members }] = await Promise.all([
+    supabase
+      .from("restaurants")
+      .select("*")
+      .eq("id", membership.restaurantId)
+      .maybeSingle(),
+    supabase
+      .from("restaurant_members")
+      .select("*")
+      .eq("restaurant_id", membership.restaurantId)
+      .order("created_at", { ascending: true }),
+  ]);
 
   if (!restaurant) {
-    return <p className="text-muted">ยังไม่มีร้าน — กรุณา signup ใหม่</p>;
+    return <p className="text-muted">ยังไม่มีร้าน - กรุณา signup ใหม่</p>;
   }
-
-  const { data: members } = await supabase
-    .from("restaurant_members")
-    .select("*")
-    .eq("restaurant_id", membership.restaurantId)
-    .order("created_at", { ascending: true });
 
   return (
     <div className="space-y-8">
