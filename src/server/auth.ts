@@ -25,7 +25,7 @@ export async function getDashboardSession(): Promise<DashboardSession | null> {
   const supabase = await createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
 
   if (!user) return null;
 
