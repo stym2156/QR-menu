@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getDashboardSummary } from "@/features/dashboard/queries";
 import { requireDashboardSession } from "@/server/auth";
 import DashboardCards from "./DashboardCards";
+import StatsPage from "./stats/page";
 
 export default async function DashboardPage() {
   const { supabase, membership } = await requireDashboardSession();
@@ -17,15 +18,20 @@ export default async function DashboardPage() {
   const summary = await getDashboardSummary(supabase, membership.restaurantId);
 
   return (
-    <DashboardCards
-      todayRevenue={summary.todayRevenue}
-      todayPaidCount={summary.todayPaidCount}
-      pendingCount={summary.pendingCount}
-      unpaidTableCount={summary.unpaidTableCount}
-      unpaidTotal={summary.unpaidTotal}
-      callCount={summary.callCount}
-      menuCount={summary.menuCount}
-      tableCount={summary.tableCount}
-    />
+    <div>
+      <DashboardCards
+        todayRevenue={summary.todayRevenue}
+        todayPaidCount={summary.todayPaidCount}
+        pendingCount={summary.pendingCount}
+        unpaidTableCount={summary.unpaidTableCount}
+        unpaidTotal={summary.unpaidTotal}
+        callCount={summary.callCount}
+        menuCount={summary.menuCount}
+        tableCount={summary.tableCount}
+      />
+      <div className="mt-10">
+        <StatsPage />
+      </div>
+    </div>
   );
 }
