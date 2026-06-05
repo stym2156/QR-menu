@@ -13,6 +13,8 @@
     "test:e2e:install": "playwright install --with-deps"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1062.0",
+    "@aws-sdk/s3-request-presigner": "^3.1062.0",
     "@sentry/nextjs": "^10.53.1",
     "@sentry/node": "^10.53.1",
     "@supabase/ssr": "^0.5.2",
