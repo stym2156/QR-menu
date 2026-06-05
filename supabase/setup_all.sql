@@ -1,10 +1,10 @@
 -- ============================================================
--- ShopQR / QR Menu — Full Database Setup (combined 0001-0020)
+-- ShopQR / QR Menu — Full Database Setup (combined 0001-0021)
 -- ============================================================
 -- Run ONCE in Supabase Dashboard → SQL Editor → New query → Run.
 -- Idempotent: safe to re-run; will not duplicate or break existing data.
 --
--- This file is the equivalent of running migrations 0001 through 0020
+-- This file is the equivalent of running migrations 0001 through 0021
 -- in order. After running this, your database matches the latest schema
 -- the application expects.
 --
@@ -1081,6 +1081,31 @@ begin
 end $$;
 
 create index if not exists tables_zone_id_idx on public.tables(zone_id);
+
+-- ============================================================
+-- 0021: Performance indexes for customer menu and order flows
+-- ============================================================
+
+create index if not exists menus_restaurant_available_created_idx
+  on public.menus(restaurant_id, available, created_at desc);
+
+create index if not exists orders_table_open_created_idx
+  on public.orders(restaurant_id, table_id, paid, created_at);
+
+create index if not exists orders_restaurant_status_created_idx
+  on public.orders(restaurant_id, status, created_at);
+
+create index if not exists orders_restaurant_paid_status_created_idx
+  on public.orders(restaurant_id, paid, status, created_at);
+
+create index if not exists orders_restaurant_paid_paid_at_idx
+  on public.orders(restaurant_id, paid, paid_at desc);
+
+create index if not exists call_staff_pending_created_idx
+  on public.call_staff_requests(restaurant_id, acknowledged, created_at);
+
+create index if not exists promotions_active_sort_created_idx
+  on public.promotions(restaurant_id, active, sort_order, created_at desc);
 
 -- ============================================================
 -- Reload PostgREST schema cache so new columns are immediately visible

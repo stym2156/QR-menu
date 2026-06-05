@@ -1,14 +1,24 @@
 import { withSentryConfig } from "@sentry/nextjs";
 
+const remotePatterns = [
+  {
+    protocol: "https",
+    hostname: "*.supabase.co",
+  },
+];
+
+if (process.env.R2_PUBLIC_BASE_URL) {
+  const r2Url = new URL(process.env.R2_PUBLIC_BASE_URL);
+  remotePatterns.push({
+    protocol: r2Url.protocol.replace(":", ""),
+    hostname: r2Url.hostname,
+  });
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "*.supabase.co",
-      },
-    ],
+    remotePatterns,
   },
 };
 
