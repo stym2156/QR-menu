@@ -1,10 +1,10 @@
 -- ============================================================
--- ShopQR / QR Menu — Full Database Setup (combined 0001-0015)
+-- ShopQR / QR Menu — Full Database Setup (combined 0001-0020)
 -- ============================================================
 -- Run ONCE in Supabase Dashboard → SQL Editor → New query → Run.
 -- Idempotent: safe to re-run; will not duplicate or break existing data.
 --
--- This file is the equivalent of running migrations 0001 through 0015
+-- This file is the equivalent of running migrations 0001 through 0020
 -- in order. After running this, your database matches the latest schema
 -- the application expects.
 --
@@ -967,6 +967,42 @@ begin
       check (kitchen_print_width in (58, 76, 80));
   end if;
 end $$;
+
+-- ============================================================
+-- 0019: Audit log
+-- ============================================================
+
+create table if not exists public.audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  restaurant_id uuid not null references public.restaurants(id) on delete cascade,
+  actor_user_id uuid references auth.users(id) on delete set null,
+  action text not null,
+  target_id uuid,
+  details jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists audit_logs_restaurant_idx
+  on public.audit_logs (restaurant_id, created_at desc);
+create index if not exists audit_logs_action_idx
+  on public.audit_logs (restaurant_id, action, created_at desc);
+create index if not exists audit_logs_target_idx
+  on public.audit_logs (target_id);
+
+alter table public.audit_logs enable row level security;
+
+drop policy if exists audit_logs_read on public.audit_logs;
+create policy audit_logs_read on public.audit_logs
+  for select using (has_restaurant_access(restaurant_id));
+
+drop policy if exists audit_logs_insert on public.audit_logs;
+create policy audit_logs_insert on public.audit_logs
+  for insert with check (
+    has_restaurant_access(restaurant_id)
+    and (actor_user_id is null or actor_user_id = auth.uid())
+  );
+
+-- No update / delete policies: audit logs are append-only by RLS.
 
 -- ============================================================
 -- 0020: Table zones
