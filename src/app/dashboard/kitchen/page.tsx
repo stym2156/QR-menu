@@ -1,5 +1,11 @@
 import { redirect } from "next/navigation";
 import { canActKitchen, canSeeKitchen } from "@/lib/membership";
+import {
+  MENU_SELECT,
+  ORDER_SELECT,
+  TABLE_SELECT,
+  TABLE_ZONE_SELECT,
+} from "@/lib/db/selects";
 import { requireDashboardSession } from "@/server/auth";
 import KitchenDisplay from "./KitchenDisplay";
 import I18nPageHeader from "@/components/I18nPageHeader";
@@ -26,23 +32,23 @@ export default async function KitchenPage() {
   ] = await Promise.all([
     supabase
       .from("orders")
-      .select("*")
+      .select(ORDER_SELECT)
       .eq("restaurant_id", membership.restaurantId)
       .in("status", ["pending", "ready"])
       .order("created_at", { ascending: true }),
     supabase
       .from("orders")
-      .select("*")
+      .select(ORDER_SELECT)
       .eq("restaurant_id", membership.restaurantId)
       .in("status", ["served", "cancelled"])
       .gte("completed_at", since.toISOString())
       .order("completed_at", { ascending: false })
       .limit(100),
-    supabase.from("menus").select("*").eq("restaurant_id", membership.restaurantId),
-    supabase.from("tables").select("*").eq("restaurant_id", membership.restaurantId),
+    supabase.from("menus").select(MENU_SELECT).eq("restaurant_id", membership.restaurantId),
+    supabase.from("tables").select(TABLE_SELECT).eq("restaurant_id", membership.restaurantId),
     supabase
       .from("table_zones")
-      .select("*")
+      .select(TABLE_ZONE_SELECT)
       .eq("restaurant_id", membership.restaurantId)
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),

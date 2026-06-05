@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { useToast } from "@/components/toast";
+import { ORDER_SELECT } from "@/lib/db/selects";
 import { useT } from "@/lib/i18n/I18nProvider";
 import type { Order } from "@/lib/types";
 
@@ -25,9 +26,11 @@ export function useTableOrders({
     let cancelled = false;
     void supabase
       .from("orders")
-      .select("*")
+      .select(ORDER_SELECT)
       .eq("restaurant_id", restaurantId)
       .eq("table_id", tableId)
+      .eq("paid", false)
+      .neq("status", "cancelled")
       .order("created_at", { ascending: true })
       .then(({ data }) => {
         if (!cancelled) setOrders((data ?? []) as Order[]);

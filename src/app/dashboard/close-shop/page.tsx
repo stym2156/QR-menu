@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { MENU_SELECT, ORDER_SELECT } from "@/lib/db/selects";
 import { isOwner } from "@/lib/membership";
 import { requireDashboardSession } from "@/server/auth";
 import CloseShopView from "./CloseShopView";
@@ -20,12 +21,12 @@ export default async function CloseShopPage() {
   const [{ data: orders }, { data: menus }] = await Promise.all([
     supabase
       .from("orders")
-      .select("*")
+      .select(ORDER_SELECT)
       .eq("restaurant_id", membership.restaurantId)
       .eq("paid", true)
       .gte("paid_at", since.toISOString())
       .order("paid_at", { ascending: false }),
-    supabase.from("menus").select("*").eq("restaurant_id", membership.restaurantId),
+    supabase.from("menus").select(MENU_SELECT).eq("restaurant_id", membership.restaurantId),
   ]);
 
   return (

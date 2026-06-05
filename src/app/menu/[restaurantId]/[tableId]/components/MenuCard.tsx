@@ -51,6 +51,7 @@ export function MenuCard({
               alt={displayName}
               fill
               sizes="(max-width: 640px) 50vw, 240px"
+              quality={70}
               className="object-cover transition duration-500 group-hover:scale-105"
             />
           ) : (

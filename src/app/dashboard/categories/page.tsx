@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { CATEGORY_SELECT } from "@/lib/db/selects";
 import { isOwner } from "@/lib/membership";
 import { requireDashboardSession } from "@/server/auth";
 import CategoryManager from "./CategoryManager";
@@ -13,7 +14,7 @@ export default async function CategoriesPage() {
 
   const { data: categories } = await supabase
     .from("categories")
-    .select("*")
+    .select(CATEGORY_SELECT)
     .eq("restaurant_id", membership.restaurantId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });

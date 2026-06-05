@@ -1,4 +1,11 @@
 import { redirect } from "next/navigation";
+import {
+  CATEGORY_SELECT,
+  MENU_SELECT,
+  PROMOTION_SELECT,
+  RESTAURANT_SELECT,
+  TABLE_SELECT,
+} from "@/lib/db/selects";
 import { canSeeMenu, isOwner } from "@/lib/membership";
 import { getShopStatus } from "@/lib/hours";
 import { requireDashboardSession } from "@/server/auth";
@@ -29,32 +36,32 @@ export default async function MenuPage() {
     await Promise.all([
       supabase
         .from("menus")
-        .select("*")
+        .select(MENU_SELECT)
         .eq("restaurant_id", membership.restaurantId)
         .order("created_at", { ascending: false }),
       supabase
         .from("categories")
-        .select("*")
+        .select(CATEGORY_SELECT)
         .eq("restaurant_id", membership.restaurantId)
         .order("sort_order", { ascending: true }),
       isStaff
         ? supabase
             .from("restaurants")
-            .select("*")
+            .select(RESTAURANT_SELECT)
             .eq("id", membership.restaurantId)
             .maybeSingle()
         : Promise.resolve({ data: null }),
       isStaff
         ? supabase
             .from("tables")
-            .select("*")
+            .select(TABLE_SELECT)
             .eq("restaurant_id", membership.restaurantId)
             .order("table_number", { ascending: true })
         : Promise.resolve({ data: null }),
       isStaff
         ? supabase
             .from("promotions")
-            .select("*")
+            .select(PROMOTION_SELECT)
             .eq("restaurant_id", membership.restaurantId)
             .eq("active", true)
         : Promise.resolve({ data: null }),

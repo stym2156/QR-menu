@@ -78,6 +78,7 @@ export function CartSheet({
                         alt={pickName(menu, locale)}
                         fill
                         sizes="64px"
+                        quality={60}
                         className="object-cover"
                       />
                     ) : (

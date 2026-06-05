@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { TABLE_SELECT, TABLE_ZONE_SELECT } from "@/lib/db/selects";
 import {
   canActTables,
   canManageTables,
@@ -18,12 +19,12 @@ export default async function TablesPage() {
   const [{ data: tables }, { data: zones }] = await Promise.all([
     supabase
       .from("tables")
-      .select("*")
+      .select(TABLE_SELECT)
       .eq("restaurant_id", membership.restaurantId)
       .order("table_number", { ascending: true }),
     supabase
       .from("table_zones")
-      .select("*")
+      .select(TABLE_ZONE_SELECT)
       .eq("restaurant_id", membership.restaurantId)
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { ORDER_SELECT } from "@/lib/db/selects";
 import { formatKIP, formatTime } from "@/lib/format";
 import { EmptyState, buttonSecondary } from "@/components/ui";
 import { useToast } from "@/components/toast";
@@ -230,7 +231,7 @@ export default function BillsView({
       toast.error(t("bill.settle.failed", { error: error.message }));
       const { data } = await supabase
         .from("orders")
-        .select("*")
+        .select(ORDER_SELECT)
         .eq("restaurant_id", restaurantId)
         .eq("paid", false);
       setOrders((data ?? []) as Order[]);

@@ -1,4 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  CATEGORY_SELECT,
+  MENU_SELECT,
+  PROMOTION_SELECT,
+} from "@/lib/db/selects";
 import { getShopStatus } from "@/lib/hours";
 import type { Category, Menu, Promotion } from "@/lib/types";
 
@@ -59,18 +64,18 @@ export async function getCustomerMenuData(
       .maybeSingle(),
     supabase
       .from("menus")
-      .select("*")
+      .select(MENU_SELECT)
       .eq("restaurant_id", restaurantId)
       .eq("available", true)
       .order("created_at", { ascending: false }),
     supabase
       .from("categories")
-      .select("*")
+      .select(CATEGORY_SELECT)
       .eq("restaurant_id", restaurantId)
       .order("sort_order", { ascending: true }),
     supabase
       .from("promotions")
-      .select("*")
+      .select(PROMOTION_SELECT)
       .eq("restaurant_id", restaurantId)
       .eq("active", true)
       .or(`start_at.is.null,start_at.lte.${nowIso}`)

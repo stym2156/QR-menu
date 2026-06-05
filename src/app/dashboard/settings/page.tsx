@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { RESTAURANT_SELECT } from "@/lib/db/selects";
 import { requireDashboardSession } from "@/server/auth";
 import SettingsForm from "./SettingsForm";
 import StaffManager from "./StaffManager";
@@ -24,12 +25,12 @@ export default async function SettingsPage() {
   const [{ data: restaurant }, { data: members }] = await Promise.all([
     supabase
       .from("restaurants")
-      .select("*")
+      .select(RESTAURANT_SELECT)
       .eq("id", membership.restaurantId)
       .maybeSingle(),
     supabase
       .from("restaurant_members")
-      .select("*")
+      .select("id, user_id, role, invited_email, phone, created_at")
       .eq("restaurant_id", membership.restaurantId)
       .order("created_at", { ascending: true }),
   ]);

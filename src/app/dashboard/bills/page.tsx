@@ -1,5 +1,12 @@
 import { redirect } from "next/navigation";
 import { canActBills, canSeeBills } from "@/lib/membership";
+import {
+  CALL_STAFF_SELECT,
+  MENU_SELECT,
+  ORDER_SELECT,
+  TABLE_SELECT,
+  TABLE_ZONE_SELECT,
+} from "@/lib/db/selects";
 import { requireDashboardSession } from "@/server/auth";
 import BillsView from "./BillsView";
 import I18nPageHeader from "@/components/I18nPageHeader";
@@ -36,33 +43,33 @@ export default async function BillsPage() {
   ] = await Promise.all([
     supabase
       .from("orders")
-      .select("*")
+      .select(ORDER_SELECT)
       .eq("restaurant_id", restaurant.id)
       .eq("paid", false)
       .neq("status", "cancelled")
       .order("created_at", { ascending: true }),
     supabase
       .from("orders")
-      .select("*")
+      .select(ORDER_SELECT)
       .eq("restaurant_id", restaurant.id)
       .eq("paid", true)
       .gte("paid_at", since.toISOString())
       .order("paid_at", { ascending: false }),
     supabase
       .from("tables")
-      .select("*")
+      .select(TABLE_SELECT)
       .eq("restaurant_id", restaurant.id)
       .order("table_number", { ascending: true }),
     supabase
       .from("table_zones")
-      .select("*")
+      .select(TABLE_ZONE_SELECT)
       .eq("restaurant_id", restaurant.id)
       .order("sort_order", { ascending: true })
       .order("name", { ascending: true }),
-    supabase.from("menus").select("*").eq("restaurant_id", restaurant.id),
+    supabase.from("menus").select(MENU_SELECT).eq("restaurant_id", restaurant.id),
     supabase
       .from("call_staff_requests")
-      .select("*")
+      .select(CALL_STAFF_SELECT)
       .eq("restaurant_id", restaurant.id)
       .eq("acknowledged", false)
       .order("created_at", { ascending: true }),

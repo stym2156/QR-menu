@@ -18,7 +18,7 @@ export default async function FeedbackPage() {
       .maybeSingle(),
     supabase
       .from("feedback")
-      .select("*")
+      .select("id, user_id, restaurant_id, email, category, message, resolved, admin_reply, replied_at, created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(20),

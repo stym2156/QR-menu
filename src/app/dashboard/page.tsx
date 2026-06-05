@@ -2,10 +2,11 @@ import { redirect } from "next/navigation";
 import { getDashboardSummary } from "@/features/dashboard/queries";
 import { requireDashboardSession } from "@/server/auth";
 import DashboardCards from "./DashboardCards";
-import StatsPage from "./stats/page";
+import { StatsPageContent } from "./stats/StatsPageContent";
 
 export default async function DashboardPage() {
-  const { supabase, membership } = await requireDashboardSession();
+  const session = await requireDashboardSession();
+  const { supabase, membership } = session;
 
   // Non-owners land on their primary work page instead of the owner dashboard.
   if (membership.role === "cook" || membership.role === "staff") {
@@ -30,7 +31,7 @@ export default async function DashboardPage() {
         tableCount={summary.tableCount}
       />
       <div className="mt-10">
-        <StatsPage />
+        <StatsPageContent session={session} />
       </div>
     </div>
   );

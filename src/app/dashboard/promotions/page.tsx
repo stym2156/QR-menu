@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { PROMOTION_SELECT } from "@/lib/db/selects";
 import { isOwner } from "@/lib/membership";
 import { requireDashboardSession } from "@/server/auth";
 import PromotionManager from "./PromotionManager";
@@ -13,7 +14,7 @@ export default async function PromotionsPage() {
 
   const { data: promotions } = await supabase
     .from("promotions")
-    .select("*")
+    .select(PROMOTION_SELECT)
     .eq("restaurant_id", membership.restaurantId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: false });

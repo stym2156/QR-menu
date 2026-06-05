@@ -82,6 +82,7 @@ function PromotionCard({ promotion }: { promotion: Promotion }) {
             alt={promotion.title}
             fill
             sizes="(min-width: 1024px) 40vw, (min-width: 640px) 60vw, 85vw"
+            quality={70}
             className="object-contain"
           />
         ) : (
