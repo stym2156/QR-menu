@@ -60,6 +60,11 @@ export default function TableManager({
   const [origin, setOrigin] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [zoneFilter, setZoneFilter] = useState<string>("all");
+  const [bulkZoneNames, setBulkZoneNames] = useState("");
+  const [bulkFrom, setBulkFrom] = useState("1");
+  const [bulkTo, setBulkTo] = useState("30");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkError, setBulkError] = useState<string | null>(null);
 
   const zoneMap = useMemo(() => new Map(zones.map((z) => [z.id, z])), [zones]);
 
@@ -259,6 +264,121 @@ export default function TableManager({
     setBusy(false);
   }
 
+  async function handleBulkCreate(e: React.FormEvent): Promise<void> {
+    e.preventDefault();
+    setBulkError(null);
+
+    const zoneNames = parseBulkZoneNames(bulkZoneNames);
+    const from = parseInt(bulkFrom, 10);
+    const to = parseInt(bulkTo, 10);
+
+    if (zoneNames.length === 0) {
+      setBulkError("กรุณาใส่ชื่อโซนอย่างน้อย 1 โซน เช่น Zone1.Zone2.Zone3");
+      return;
+    }
+    if (!Number.isFinite(from) || !Number.isFinite(to) || from <= 0 || to <= 0 || from > to) {
+      setBulkError("ช่วงโต๊ะไม่ถูกต้อง กรุณาใส่ From/To เช่น 1 ถึง 30");
+      return;
+    }
+    if (zoneNames.length * (to - from + 1) > 500) {
+      setBulkError("สร้างได้สูงสุดครั้งละ 500 โต๊ะ เพื่อลดโอกาส timeout");
+      return;
+    }
+
+    setBulkBusy(true);
+
+    let nextZones = zones;
+    const existingByName = new Map(
+      nextZones.map((zone) => [zone.name.trim().toLowerCase(), zone]),
+    );
+    const missingNames = zoneNames.filter(
+      (name) => !existingByName.has(name.toLowerCase()),
+    );
+
+    if (missingNames.length > 0) {
+      const maxSort =
+        nextZones.length > 0 ? Math.max(...nextZones.map((z) => z.sort_order)) : -1;
+      const { data: createdZones, error: zoneInsertError } = await supabase
+        .from("table_zones")
+        .insert(
+          missingNames.map((name, index) => ({
+            restaurant_id: restaurantId,
+            name,
+            sort_order: maxSort + index + 1,
+          })),
+        )
+        .select();
+
+      if (zoneInsertError || !createdZones) {
+        setBulkBusy(false);
+        setBulkError(`สร้างโซนไม่สำเร็จ: ${zoneInsertError?.message ?? ""}`);
+        return;
+      }
+
+      nextZones = [...nextZones, ...((createdZones ?? []) as TableZone[])].sort(zoneSort);
+      setZones(nextZones);
+    }
+
+    const zoneByName = new Map(
+      nextZones.map((zone) => [zone.name.trim().toLowerCase(), zone]),
+    );
+    const wantedZones = zoneNames
+      .map((name) => zoneByName.get(name.toLowerCase()))
+      .filter((zone): zone is TableZone => Boolean(zone));
+    const existingTableKeys = new Set(
+      tables.map((table) => `${table.zone_id}:${table.table_number}`),
+    );
+    const rows: Array<{
+      restaurant_id: string;
+      zone_id: string;
+      table_number: number;
+    }> = [];
+
+    for (const zone of wantedZones) {
+      for (let tableNumber = from; tableNumber <= to; tableNumber += 1) {
+        const key = `${zone.id}:${tableNumber}`;
+        if (existingTableKeys.has(key)) continue;
+        existingTableKeys.add(key);
+        rows.push({
+          restaurant_id: restaurantId,
+          zone_id: zone.id,
+          table_number: tableNumber,
+        });
+      }
+    }
+
+    if (rows.length === 0) {
+      setBulkBusy(false);
+      toast.success("ทุกโต๊ะในช่วงนี้มีอยู่แล้ว");
+      return;
+    }
+
+    const { data: createdTables, error: tableInsertError } = await supabase
+      .from("tables")
+      .insert(rows)
+      .select();
+
+    setBulkBusy(false);
+    if (tableInsertError || !createdTables) {
+      setBulkError(`สร้างโต๊ะไม่สำเร็จ: ${tableInsertError?.message ?? ""}`);
+      return;
+    }
+
+    setTables((prev) =>
+      [...prev, ...((createdTables ?? []) as DiningTable[])].sort(
+        (a, b) =>
+          (zoneMap.get(a.zone_id)?.sort_order ?? 0) -
+            (zoneMap.get(b.zone_id)?.sort_order ?? 0) ||
+          a.table_number - b.table_number,
+      ),
+    );
+    setSelectedZoneId(wantedZones[0]?.id ?? selectedZoneId);
+    setZoneFilter("all");
+    toast.success(
+      `สร้าง ${wantedZones.length} โซน และเพิ่มโต๊ะใหม่ ${createdTables.length} โต๊ะแล้ว`,
+    );
+  }
+
   async function deleteTable(table: DiningTable): Promise<void> {
     const ok = await confirm({
       title: t("mgr.tbl.delete.title", { n: table.table_number }),
@@ -425,6 +545,57 @@ export default function TableManager({
               {busy ? t("mgr.tbl.submitting") : t("mgr.tbl.submit")}
             </button>
           </form>
+
+          <form onSubmit={handleBulkCreate} className={`${card} ${cardPad} space-y-4`}>
+            <SectionHeading
+              title="สร้างหลายโซน + หลายโต๊ะ"
+              description="วางชื่อโซน แล้วกำหนดช่วงเลขโต๊ะ ระบบจะสร้างให้ครบทุกโซน"
+            />
+
+            <FormField label="ชื่อโซน">
+              <textarea
+                value={bulkZoneNames}
+                onChange={(e) => setBulkZoneNames(e.target.value)}
+                className={`${input} min-h-24 resize-y`}
+                placeholder="Zone1.Zone2.Zone3.Zone4.Zone5"
+              />
+            </FormField>
+
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label="From">
+                <input
+                  type="number"
+                  min="1"
+                  value={bulkFrom}
+                  onChange={(e) => setBulkFrom(e.target.value)}
+                  className={`${input} tabular-nums`}
+                />
+              </FormField>
+              <FormField label="To">
+                <input
+                  type="number"
+                  min="1"
+                  value={bulkTo}
+                  onChange={(e) => setBulkTo(e.target.value)}
+                  className={`${input} tabular-nums`}
+                />
+              </FormField>
+            </div>
+
+            {bulkError ? (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                {bulkError}
+              </p>
+            ) : null}
+
+            <button
+              type="submit"
+              disabled={bulkBusy || !bulkZoneNames.trim()}
+              className={`${buttonPrimary} w-full`}
+            >
+              {bulkBusy ? "กำลังสร้าง..." : "สร้างโซนและโต๊ะทั้งหมด"}
+            </button>
+          </form>
         </div>
       ) : null}
 
@@ -533,6 +704,19 @@ export default function TableManager({
       </div>
     </div>
   );
+}
+
+function parseBulkZoneNames(value: string): string[] {
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const raw of value.split(/[\n\r,.;]+/)) {
+    const name = raw.trim();
+    const key = name.toLowerCase();
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+  }
+  return names;
 }
 
 interface TableCardProps {

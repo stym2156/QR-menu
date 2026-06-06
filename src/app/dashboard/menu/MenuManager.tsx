@@ -29,6 +29,17 @@ interface Props {
   canAct: boolean;
 }
 
+type MenuImportRow = {
+  categoryName: string;
+  name: string;
+  nameLo: string;
+  nameEn: string;
+  price: number;
+  available: boolean;
+  imageUrl: string;
+  rowNumber: number;
+};
+
 export default function MenuManager({
   restaurantId,
   initialMenus,
@@ -57,6 +68,10 @@ export default function MenuManager({
   const [availabilityFilter, setAvailabilityFilter] = useState<
     "all" | "available" | "unavailable"
   >("all");
+  const [importRows, setImportRows] = useState<MenuImportRow[]>([]);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [importFileName, setImportFileName] = useState("");
+  const [importBusy, setImportBusy] = useState(false);
 
   const categoryMap = useMemo(
     () => new Map(categories.map((c) => [c.id, c])),
@@ -293,6 +308,181 @@ export default function MenuManager({
     else toast.success(t("mgr.menu.deleted", { name: menu.name }));
   }
 
+  async function handleImportFile(file: File | null): Promise<void> {
+    setImportRows([]);
+    setImportErrors([]);
+    setImportFileName(file?.name ?? "");
+    if (!file) return;
+
+    try {
+      const XLSX = await import("xlsx");
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const firstSheetName = workbook.SheetNames[0];
+      const firstSheet = firstSheetName ? workbook.Sheets[firstSheetName] : null;
+      if (!firstSheet) {
+        setImportErrors(["ไม่พบ sheet ในไฟล์นี้"]);
+        return;
+      }
+      const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, {
+        defval: "",
+      });
+      const parsed = parseMenuImportRows(rawRows);
+      setImportRows(parsed.rows);
+      setImportErrors(parsed.errors);
+    } catch (err) {
+      setImportErrors([
+        err instanceof Error ? err.message : "อ่านไฟล์ไม่สำเร็จ",
+      ]);
+    }
+  }
+
+  async function importParsedRows(): Promise<void> {
+    if (importRows.length === 0 || importBusy) return;
+    setImportBusy(true);
+    setImportErrors([]);
+
+    const categoryByName = new Map(
+      categories.map((category) => [normalizeImportKey(category.name), category]),
+    );
+    const missingCategoryNames: string[] = [];
+    for (const row of importRows) {
+      if (!row.categoryName) continue;
+      const key = normalizeImportKey(row.categoryName);
+      if (categoryByName.has(key) || missingCategoryNames.includes(row.categoryName)) {
+        continue;
+      }
+      missingCategoryNames.push(row.categoryName);
+    }
+
+    let nextCategories = categories;
+    if (missingCategoryNames.length > 0) {
+      const maxSort =
+        categories.length > 0
+          ? Math.max(...categories.map((category) => category.sort_order))
+          : -1;
+      const { data: createdCategories, error: categoryError } = await supabase
+        .from("categories")
+        .insert(
+          missingCategoryNames.map((categoryName, index) => ({
+            restaurant_id: restaurantId,
+            name: categoryName,
+            sort_order: maxSort + index + 1,
+          })),
+        )
+        .select();
+
+      if (categoryError || !createdCategories) {
+        setImportBusy(false);
+        setImportErrors([`สร้างหมวดหมู่ไม่สำเร็จ: ${categoryError?.message ?? ""}`]);
+        return;
+      }
+
+      nextCategories = [...categories, ...((createdCategories ?? []) as Category[])];
+      setCategories(nextCategories);
+      for (const category of createdCategories as Category[]) {
+        categoryByName.set(normalizeImportKey(category.name), category);
+      }
+    }
+
+    const existingByKey = new Map(
+      menus.map((menu) => [
+        menuImportKey(menu.category_id, menu.name),
+        menu,
+      ]),
+    );
+    const insertRows: Array<{
+      restaurant_id: string;
+      category_id: string | null;
+      name: string;
+      name_lo: string | null;
+      name_en: string | null;
+      price: number;
+      available: boolean;
+      image_url: string | null;
+    }> = [];
+    const updateJobs: Array<Promise<Menu | null>> = [];
+
+    for (const row of importRows) {
+      const category = row.categoryName
+        ? categoryByName.get(normalizeImportKey(row.categoryName))
+        : undefined;
+      const categoryId = category?.id ?? null;
+      const existing = existingByKey.get(menuImportKey(categoryId, row.name));
+      const patch = {
+        category_id: categoryId,
+        name: row.name,
+        name_lo: row.nameLo || null,
+        name_en: row.nameEn || null,
+        price: row.price,
+        available: row.available,
+        ...(row.imageUrl ? { image_url: row.imageUrl } : {}),
+      };
+
+      if (existing) {
+        updateJobs.push(
+          Promise.resolve(
+            supabase
+              .from("menus")
+              .update(patch)
+              .eq("id", existing.id)
+              .select()
+              .single(),
+          ).then(({ data, error }) => {
+            if (error || !data) throw error ?? new Error("Update failed");
+            return data as Menu;
+          }),
+        );
+      } else {
+        insertRows.push({
+          restaurant_id: restaurantId,
+          category_id: categoryId,
+          name: row.name,
+          name_lo: row.nameLo || null,
+          name_en: row.nameEn || null,
+          price: row.price,
+          available: row.available,
+          image_url: row.imageUrl || null,
+        });
+      }
+    }
+
+    try {
+      const updatedMenus = (await Promise.all(updateJobs)).filter(
+        (menu): menu is Menu => Boolean(menu),
+      );
+      let insertedMenus: Menu[] = [];
+      if (insertRows.length > 0) {
+        const { data, error: insertError } = await supabase
+          .from("menus")
+          .insert(insertRows)
+          .select();
+        if (insertError || !data) throw insertError ?? new Error("Insert failed");
+        insertedMenus = data as Menu[];
+      }
+
+      setMenus((prev) => {
+        const byId = new Map(prev.map((menu) => [menu.id, menu]));
+        for (const menu of updatedMenus) byId.set(menu.id, menu);
+        for (const menu of insertedMenus) byId.set(menu.id, menu);
+        return Array.from(byId.values()).sort(
+          (a, b) => b.created_at.localeCompare(a.created_at),
+        );
+      });
+      setImportRows([]);
+      setImportFileName("");
+      toast.success(
+        `นำเข้าเสร็จแล้ว: เพิ่มใหม่ ${insertedMenus.length} เมนู, อัปเดต ${updatedMenus.length} เมนู`,
+      );
+    } catch (err) {
+      setImportErrors([
+        err instanceof Error ? `นำเข้าไม่สำเร็จ: ${err.message}` : "นำเข้าไม่สำเร็จ",
+      ]);
+    } finally {
+      setImportBusy(false);
+    }
+  }
+
   return (
     <div
       className={`grid grid-cols-1 gap-5 py-2 xl:gap-6 ${
@@ -301,7 +491,76 @@ export default function MenuManager({
     >
       {/* ฝั่งซ้าย: ฟอร์มเพิ่มเมนู — เฉพาะ owner เท่านั้น */}
       {canAct ? (
-      <div className="lg:sticky lg:top-20 h-fit">
+      <div className="space-y-4 lg:sticky lg:top-20 h-fit">
+        <div className={`${card} ${cardPad} space-y-4 rounded-2xl border border-line/60 bg-surface shadow-sm`}>
+          <SectionHeading
+            title="นำเข้าเมนูจาก Excel"
+            description="รองรับ .xlsx, .xls, .csv โดยใช้หัวคอลัมน์ category, name, price"
+          />
+          <FormField label="ไฟล์ Excel / CSV">
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={(e) => void handleImportFile(e.target.files?.[0] ?? null)}
+              className={input}
+            />
+          </FormField>
+          {importFileName ? (
+            <div className="rounded-xl border border-line bg-canvas/40 px-3 py-2 text-xs text-muted">
+              <div className="font-medium text-ink">{importFileName}</div>
+              <div className="mt-1">
+                อ่านได้ {importRows.length} แถว
+                {importErrors.length > 0 ? `, พบปัญหา ${importErrors.length} จุด` : ""}
+              </div>
+            </div>
+          ) : null}
+          {importErrors.length > 0 ? (
+            <div className="max-h-32 overflow-y-auto rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">
+              {importErrors.slice(0, 8).map((message) => (
+                <p key={message}>{message}</p>
+              ))}
+              {importErrors.length > 8 ? <p>และอีก {importErrors.length - 8} จุด</p> : null}
+            </div>
+          ) : null}
+          {importRows.length > 0 ? (
+            <div className="rounded-xl border border-line bg-surface">
+              <div className="grid grid-cols-[1fr_80px] border-b border-line px-3 py-2 text-[11px] font-semibold text-muted">
+                <span>ตัวอย่างเมนู</span>
+                <span className="text-right">ราคา</span>
+              </div>
+              <div className="max-h-36 overflow-y-auto">
+                {importRows.slice(0, 6).map((row) => (
+                  <div
+                    key={`${row.rowNumber}-${row.name}`}
+                    className="grid grid-cols-[1fr_80px] gap-2 border-b border-line/60 px-3 py-2 text-xs last:border-0"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-ink">{row.name}</div>
+                      <div className="truncate text-muted">
+                        {row.categoryName || "ไม่ระบุหมวดหมู่"}
+                      </div>
+                    </div>
+                    <div className="text-right font-semibold tabular-nums text-ink">
+                      {formatKIP(row.price)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => void importParsedRows()}
+            disabled={importBusy || importRows.length === 0 || importErrors.length > 0}
+            className={`${buttonPrimary} w-full disabled:opacity-60`}
+          >
+            {importBusy ? "กำลังนำเข้า..." : "นำเข้าเมนูทั้งหมด"}
+          </button>
+          <p className="text-[11px] leading-relaxed text-muted">
+            คอลัมน์ที่ใช้ได้: category, name, name_lo, name_en, price, available, image_url
+          </p>
+        </div>
+
         <form onSubmit={handleAdd} className={`${card} ${cardPad} shadow-sm border border-line/60 rounded-2xl bg-surface space-y-4 relative overflow-hidden`}>
           <div className="border-b border-line pb-4 mb-2">
             <SectionHeading title={t("mgr.menu.add_title")} />
@@ -756,6 +1015,81 @@ interface MenuEditModalProps {
     removeImage: boolean;
   }) => Promise<boolean>;
   onClose: () => void;
+}
+
+function parseMenuImportRows(rawRows: Record<string, unknown>[]): {
+  rows: MenuImportRow[];
+  errors: string[];
+} {
+  const rows: MenuImportRow[] = [];
+  const errors: string[] = [];
+
+  rawRows.forEach((raw, index) => {
+    const rowNumber = index + 2;
+    const row = normalizeImportRow(raw);
+    const name = getImportString(row, ["name", "name_th", "menu", "menu_name"]);
+    const nameLo = getImportString(row, ["name_lo", "lo", "lao"]);
+    const nameEn = getImportString(row, ["name_en", "en", "english"]);
+    const categoryName = getImportString(row, ["category", "category_name", "หมวดหมู่"]);
+    const priceRaw = getImportString(row, ["price", "ราคา"]);
+    const imageUrl = getImportString(row, ["image_url", "image", "รูป"]);
+    const availableRaw = getImportString(row, ["available", "status", "ขาย"]);
+    const price = Number(priceRaw.replace(/,/g, ""));
+    const primaryName = name || nameLo || nameEn;
+
+    if (!primaryName && !priceRaw && !categoryName) return;
+    if (!primaryName) {
+      errors.push(`แถว ${rowNumber}: ไม่มีชื่อเมนู`);
+      return;
+    }
+    if (!Number.isFinite(price) || price < 0) {
+      errors.push(`แถว ${rowNumber}: ราคาไม่ถูกต้อง`);
+      return;
+    }
+
+    rows.push({
+      categoryName,
+      name: primaryName,
+      nameLo,
+      nameEn,
+      price,
+      available: parseImportAvailable(availableRaw),
+      imageUrl,
+      rowNumber,
+    });
+  });
+
+  return { rows, errors };
+}
+
+function normalizeImportRow(raw: Record<string, unknown>): Record<string, string> {
+  const row: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    row[normalizeImportKey(key)] = String(value ?? "").trim();
+  }
+  return row;
+}
+
+function getImportString(row: Record<string, string>, keys: string[]): string {
+  for (const key of keys) {
+    const value = row[normalizeImportKey(key)];
+    if (value) return value;
+  }
+  return "";
+}
+
+function normalizeImportKey(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, "_");
+}
+
+function menuImportKey(categoryId: string | null, name: string): string {
+  return `${categoryId ?? "none"}:${normalizeImportKey(name)}`;
+}
+
+function parseImportAvailable(value: string): boolean {
+  if (!value) return true;
+  const normalized = value.trim().toLowerCase();
+  return !["false", "0", "no", "n", "off", "ปิด", "ไม่ขาย"].includes(normalized);
 }
 
 function MenuEditModal({ menu, onSave, onClose }: MenuEditModalProps) {

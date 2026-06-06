@@ -91,6 +91,38 @@ export default function CategoryManager({ restaurantId, initialCategories }: Pro
     else toast.success(t("mgr.cat.deleted"));
   }
 
+  async function deleteCategoryWithMenus(category: Category): Promise<void> {
+    const ok = await confirm({
+      title: `ลบหมวด "${pickName(category, locale)}" พร้อมเมนูทั้งหมด?`,
+      description:
+        "เมนูอาหารทั้งหมดในหมวดนี้จะถูกลบออกถาวร เหมาะกับกรณีที่ไม่ต้องการขายหมวดนี้แล้ว",
+      confirmText: "ลบหมวด + เมนู",
+      tone: "danger",
+    });
+    if (!ok) return;
+
+    const { error: menuDeleteError } = await supabase
+      .from("menus")
+      .delete()
+      .eq("restaurant_id", restaurantId)
+      .eq("category_id", category.id);
+    if (menuDeleteError) {
+      toast.error(`ลบเมนูในหมวดไม่สำเร็จ: ${menuDeleteError.message}`);
+      return;
+    }
+
+    setCategories((prev) => prev.filter((c) => c.id !== category.id));
+    const { error: categoryDeleteError } = await supabase
+      .from("categories")
+      .delete()
+      .eq("id", category.id);
+    if (categoryDeleteError) {
+      toast.error(t("mgr.cat.delete_failed", { error: categoryDeleteError.message }));
+      return;
+    }
+    toast.success(`ลบหมวด ${pickName(category, locale)} และเมนูในหมวดแล้ว`);
+  }
+
   async function renameCategory(category: Category, newName: string): Promise<void> {
     const next = newName.trim();
     if (!next || next === category.name) return;
@@ -186,6 +218,7 @@ export default function CategoryManager({ restaurantId, initialCategories }: Pro
                   isLast={idx === categories.length - 1}
                   onRename={(name) => renameCategory(category, name)}
                   onDelete={() => deleteCategory(category)}
+                  onDeleteWithMenus={() => deleteCategoryWithMenus(category)}
                   onMoveUp={() => move(category, -1)}
                   onMoveDown={() => move(category, 1)}
                 />
@@ -205,6 +238,7 @@ interface CategoryRowProps {
   isLast: boolean;
   onRename: (name: string) => void;
   onDelete: () => void;
+  onDeleteWithMenus: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
 }
@@ -216,6 +250,7 @@ function CategoryRow({
   isLast,
   onRename,
   onDelete,
+  onDeleteWithMenus,
   onMoveUp,
   onMoveDown,
 }: CategoryRowProps) {
@@ -284,6 +319,23 @@ function CategoryRow({
         className="rounded-lg px-2 py-1 text-xs font-medium text-muted transition hover:bg-red-50 hover:text-red-600"
       >
         {t("common.delete")}
+      </button>
+      <button
+        onClick={onDeleteWithMenus}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-red-50 hover:text-red-600"
+        title="ลบหมวดพร้อมเมนูทั้งหมด"
+        aria-label="ลบหมวดพร้อมเมนูทั้งหมด"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          className="h-4 w-4"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="m5 7 1 13a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-13M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3M3 7h18" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10 11v6M14 11v6" />
+        </svg>
       </button>
     </li>
   );
