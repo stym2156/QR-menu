@@ -28,7 +28,7 @@ const config: Config = {
       },
       fontFamily: {
         // Browser picks per-character: Latin → Inter, Thai → Sarabun, Lao →
-        // Phetsarath OT (loaded via @font-face in globals.css). If a font
+        // Saysettha OT (loaded via @font-face in globals.css). If a font
         // is missing, the next one in the chain renders that glyph.
         sans: [
           "var(--font-sans)",

@@ -19,6 +19,8 @@ export function useNavBadges(restaurantId: string | null): NavBadges {
     if (!restaurantId) return;
     const supabase = createClient();
     let cancelled = false;
+    let ordersTimer: ReturnType<typeof setTimeout> | null = null;
+    let callsTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function loadOrders(): Promise<void> {
       const [{ count: pending }, { data: unpaidRows }] = await Promise.all([
@@ -43,16 +45,26 @@ export function useNavBadges(restaurantId: string | null): NavBadges {
     }
 
     async function loadCalls(): Promise<void> {
-      const { data } = await supabase
+      const { count } = await supabase
         .from("call_staff_requests")
-        .select("id")
+        .select("id", { count: "exact", head: true })
         .eq("restaurant_id", restaurantId)
         .eq("acknowledged", false);
-      if (!cancelled) setCalls((data ?? []).length);
+      if (!cancelled) setCalls(count ?? 0);
     }
 
-    void loadOrders();
-    void loadCalls();
+    function scheduleOrders(delay = 120): void {
+      if (ordersTimer) clearTimeout(ordersTimer);
+      ordersTimer = setTimeout(() => void loadOrders(), delay);
+    }
+
+    function scheduleCalls(delay = 120): void {
+      if (callsTimer) clearTimeout(callsTimer);
+      callsTimer = setTimeout(() => void loadCalls(), delay);
+    }
+
+    scheduleOrders();
+    scheduleCalls();
 
     const ordersCh = supabase
       .channel(`nav-orders-${restaurantId}`)
@@ -64,7 +76,7 @@ export function useNavBadges(restaurantId: string | null): NavBadges {
           table: "orders",
           filter: `restaurant_id=eq.${restaurantId}`,
         },
-        () => void loadOrders(),
+        () => scheduleOrders(250),
       )
       .subscribe();
 
@@ -78,12 +90,14 @@ export function useNavBadges(restaurantId: string | null): NavBadges {
           table: "call_staff_requests",
           filter: `restaurant_id=eq.${restaurantId}`,
         },
-        () => void loadCalls(),
+        () => scheduleCalls(250),
       )
       .subscribe();
 
     return () => {
       cancelled = true;
+      if (ordersTimer) clearTimeout(ordersTimer);
+      if (callsTimer) clearTimeout(callsTimer);
       void supabase.removeChannel(ordersCh);
       void supabase.removeChannel(callsCh);
     };

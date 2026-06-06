@@ -148,7 +148,7 @@ export function LinkButton({ href, children, variant = "secondary" }: LinkButton
         ? buttonGhost
         : buttonSecondary;
   return (
-    <Link href={href} className={cls}>
+    <Link href={href} prefetch={false} className={cls}>
       {children}
     </Link>
   );

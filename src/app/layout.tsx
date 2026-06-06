@@ -20,7 +20,7 @@ const sarabun = Sarabun({
   display: "swap",
 });
 
-// Lao — Phetsarath OT is loaded via @font-face in globals.css (file lives
+// Lao — Saysettha OT is loaded via @font-face in globals.css (file lives
 // in /public/fonts). Variable here is just so Tailwind's font chain can
 // reference it; the @font-face declaration defines the actual family.
 

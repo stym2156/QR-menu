@@ -239,6 +239,7 @@ export default function Sidebar({
         </button>
         <Link
           href="/dashboard"
+          prefetch={false}
           className="text-base font-semibold tracking-tight text-ink"
         >
           QR Menu
@@ -264,6 +265,7 @@ export default function Sidebar({
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <Link
             href="/dashboard"
+            prefetch={false}
             className="text-base font-semibold tracking-tight text-ink"
           >
             QR Menu
@@ -303,6 +305,7 @@ export default function Sidebar({
                 <li key={item.href}>
                   <Link
                     href={item.href}
+                    prefetch={false}
                     className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
                       active
                         ? "bg-ink text-surface"

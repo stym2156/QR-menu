@@ -77,26 +77,12 @@ export default function CategoryManager({ restaurantId, initialCategories }: Pro
     setBusy(false);
   }
 
-  async function deleteCategory(category: Category): Promise<void> {
-    const ok = await confirm({
-      title: t("mgr.cat.delete.title", { name: category.name }),
-      description: t("mgr.cat.delete.desc"),
-      confirmText: t("common.delete"),
-      tone: "danger",
-    });
-    if (!ok) return;
-    setCategories((prev) => prev.filter((c) => c.id !== category.id));
-    const { error } = await supabase.from("categories").delete().eq("id", category.id);
-    if (error) toast.error(t("mgr.cat.delete_failed", { error: error.message }));
-    else toast.success(t("mgr.cat.deleted"));
-  }
-
   async function deleteCategoryWithMenus(category: Category): Promise<void> {
+    const categoryName = pickName(category, locale);
     const ok = await confirm({
-      title: `ลบหมวด "${pickName(category, locale)}" พร้อมเมนูทั้งหมด?`,
-      description:
-        "เมนูอาหารทั้งหมดในหมวดนี้จะถูกลบออกถาวร เหมาะกับกรณีที่ไม่ต้องการขายหมวดนี้แล้ว",
-      confirmText: "ลบหมวด + เมนู",
+      title: t("mgr.cat.delete_with_menus.title", { name: categoryName }),
+      description: t("mgr.cat.delete_with_menus.desc"),
+      confirmText: t("mgr.cat.delete_with_menus.confirm"),
       tone: "danger",
     });
     if (!ok) return;
@@ -107,7 +93,11 @@ export default function CategoryManager({ restaurantId, initialCategories }: Pro
       .eq("restaurant_id", restaurantId)
       .eq("category_id", category.id);
     if (menuDeleteError) {
-      toast.error(`ลบเมนูในหมวดไม่สำเร็จ: ${menuDeleteError.message}`);
+      toast.error(
+        t("mgr.cat.delete_with_menus.menu_failed", {
+          error: menuDeleteError.message,
+        }),
+      );
       return;
     }
 
@@ -120,7 +110,7 @@ export default function CategoryManager({ restaurantId, initialCategories }: Pro
       toast.error(t("mgr.cat.delete_failed", { error: categoryDeleteError.message }));
       return;
     }
-    toast.success(`ลบหมวด ${pickName(category, locale)} และเมนูในหมวดแล้ว`);
+    toast.success(t("mgr.cat.delete_with_menus.done", { name: categoryName }));
   }
 
   async function renameCategory(category: Category, newName: string): Promise<void> {
@@ -217,7 +207,6 @@ export default function CategoryManager({ restaurantId, initialCategories }: Pro
                   isFirst={idx === 0}
                   isLast={idx === categories.length - 1}
                   onRename={(name) => renameCategory(category, name)}
-                  onDelete={() => deleteCategory(category)}
                   onDeleteWithMenus={() => deleteCategoryWithMenus(category)}
                   onMoveUp={() => move(category, -1)}
                   onMoveDown={() => move(category, 1)}
@@ -237,7 +226,6 @@ interface CategoryRowProps {
   isFirst: boolean;
   isLast: boolean;
   onRename: (name: string) => void;
-  onDelete: () => void;
   onDeleteWithMenus: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -249,7 +237,6 @@ function CategoryRow({
   isFirst,
   isLast,
   onRename,
-  onDelete,
   onDeleteWithMenus,
   onMoveUp,
   onMoveDown,
@@ -315,16 +302,10 @@ function CategoryRow({
         )}
       </div>
       <button
-        onClick={onDelete}
-        className="rounded-lg px-2 py-1 text-xs font-medium text-muted transition hover:bg-red-50 hover:text-red-600"
-      >
-        {t("common.delete")}
-      </button>
-      <button
         onClick={onDeleteWithMenus}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-red-50 hover:text-red-600"
-        title="ลบหมวดพร้อมเมนูทั้งหมด"
-        aria-label="ลบหมวดพร้อมเมนูทั้งหมด"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-red-100 bg-red-50 text-red-600 transition hover:bg-red-100 hover:text-red-700 active:scale-95"
+        title={t("mgr.cat.delete_with_menus.aria")}
+        aria-label={t("mgr.cat.delete_with_menus.aria")}
       >
         <svg
           viewBox="0 0 24 24"

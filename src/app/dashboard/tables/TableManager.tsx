@@ -273,15 +273,15 @@ export default function TableManager({
     const to = parseInt(bulkTo, 10);
 
     if (zoneNames.length === 0) {
-      setBulkError("กรุณาใส่ชื่อโซนอย่างน้อย 1 โซน เช่น Zone1.Zone2.Zone3");
+      setBulkError(t("mgr.tbl.bulk.error.no_zone"));
       return;
     }
     if (!Number.isFinite(from) || !Number.isFinite(to) || from <= 0 || to <= 0 || from > to) {
-      setBulkError("ช่วงโต๊ะไม่ถูกต้อง กรุณาใส่ From/To เช่น 1 ถึง 30");
+      setBulkError(t("mgr.tbl.bulk.error.range"));
       return;
     }
     if (zoneNames.length * (to - from + 1) > 500) {
-      setBulkError("สร้างได้สูงสุดครั้งละ 500 โต๊ะ เพื่อลดโอกาส timeout");
+      setBulkError(t("mgr.tbl.bulk.error.limit"));
       return;
     }
 
@@ -311,7 +311,7 @@ export default function TableManager({
 
       if (zoneInsertError || !createdZones) {
         setBulkBusy(false);
-        setBulkError(`สร้างโซนไม่สำเร็จ: ${zoneInsertError?.message ?? ""}`);
+        setBulkError(t("mgr.tbl.bulk.zone_failed", { error: zoneInsertError?.message ?? "" }));
         return;
       }
 
@@ -349,7 +349,7 @@ export default function TableManager({
 
     if (rows.length === 0) {
       setBulkBusy(false);
-      toast.success("ทุกโต๊ะในช่วงนี้มีอยู่แล้ว");
+      toast.success(t("mgr.tbl.bulk.exists"));
       return;
     }
 
@@ -360,7 +360,7 @@ export default function TableManager({
 
     setBulkBusy(false);
     if (tableInsertError || !createdTables) {
-      setBulkError(`สร้างโต๊ะไม่สำเร็จ: ${tableInsertError?.message ?? ""}`);
+      setBulkError(t("mgr.tbl.bulk.table_failed", { error: tableInsertError?.message ?? "" }));
       return;
     }
 
@@ -375,7 +375,10 @@ export default function TableManager({
     setSelectedZoneId(wantedZones[0]?.id ?? selectedZoneId);
     setZoneFilter("all");
     toast.success(
-      `สร้าง ${wantedZones.length} โซน และเพิ่มโต๊ะใหม่ ${createdTables.length} โต๊ะแล้ว`,
+      t("mgr.tbl.bulk.done", {
+        zones: wantedZones.length,
+        tables: createdTables.length,
+      }),
     );
   }
 
@@ -548,21 +551,21 @@ export default function TableManager({
 
           <form onSubmit={handleBulkCreate} className={`${card} ${cardPad} space-y-4`}>
             <SectionHeading
-              title="สร้างหลายโซน + หลายโต๊ะ"
-              description="วางชื่อโซน แล้วกำหนดช่วงเลขโต๊ะ ระบบจะสร้างให้ครบทุกโซน"
+              title={t("mgr.tbl.bulk.title")}
+              description={t("mgr.tbl.bulk.desc")}
             />
 
-            <FormField label="ชื่อโซน">
+            <FormField label={t("mgr.tbl.bulk.zone_names")}>
               <textarea
                 value={bulkZoneNames}
                 onChange={(e) => setBulkZoneNames(e.target.value)}
                 className={`${input} min-h-24 resize-y`}
-                placeholder="Zone1.Zone2.Zone3.Zone4.Zone5"
+                placeholder={t("mgr.tbl.bulk.zone_placeholder")}
               />
             </FormField>
 
             <div className="grid grid-cols-2 gap-3">
-              <FormField label="From">
+              <FormField label={t("mgr.tbl.bulk.from")}>
                 <input
                   type="number"
                   min="1"
@@ -571,7 +574,7 @@ export default function TableManager({
                   className={`${input} tabular-nums`}
                 />
               </FormField>
-              <FormField label="To">
+              <FormField label={t("mgr.tbl.bulk.to")}>
                 <input
                   type="number"
                   min="1"
@@ -593,7 +596,7 @@ export default function TableManager({
               disabled={bulkBusy || !bulkZoneNames.trim()}
               className={`${buttonPrimary} w-full`}
             >
-              {bulkBusy ? "กำลังสร้าง..." : "สร้างโซนและโต๊ะทั้งหมด"}
+              {bulkBusy ? t("mgr.tbl.bulk.submitting") : t("mgr.tbl.bulk.submit")}
             </button>
           </form>
         </div>

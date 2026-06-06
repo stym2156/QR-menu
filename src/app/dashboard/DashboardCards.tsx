@@ -95,6 +95,7 @@ function StatCard({ label, value, sub, href, highlight }: StatCardProps) {
   return (
     <Link
       href={href}
+      prefetch={false}
       className={`group relative overflow-hidden rounded-2xl border bg-surface p-5 transition hover:shadow-card ${
         highlight ? "border-ink/30" : "border-line"
       }`}
@@ -125,6 +126,7 @@ function ResourceCard({ label, count, href, cta }: ResourceCardProps) {
   return (
     <Link
       href={href}
+      prefetch={false}
       className="group flex items-center justify-between rounded-2xl border border-line bg-surface px-5 py-4 transition hover:border-ink/30 hover:shadow-card"
     >
       <div>

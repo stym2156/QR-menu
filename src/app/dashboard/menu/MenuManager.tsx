@@ -308,6 +308,32 @@ export default function MenuManager({
     else toast.success(t("mgr.menu.deleted", { name: menu.name }));
   }
 
+  async function deleteAllMenus(): Promise<void> {
+    if (menus.length === 0) return;
+    const ok = await confirm({
+      title: t("mgr.menu.delete_all.title"),
+      description: t("mgr.menu.delete_all.desc", { count: menus.length }),
+      confirmText: t("mgr.menu.delete_all.confirm"),
+      tone: "danger",
+    });
+    if (!ok) return;
+
+    const { error: deleteError } = await supabase
+      .from("menus")
+      .delete()
+      .eq("restaurant_id", restaurantId);
+
+    if (deleteError) {
+      toast.error(t("mgr.menu.delete_all.failed", { error: deleteError.message }));
+      return;
+    }
+
+    setMenus([]);
+    setSearchQuery("");
+    setCategoryFilter("all");
+    setAvailabilityFilter("all");
+    toast.success(t("mgr.menu.delete_all.done"));
+  }
   async function handleImportFile(file: File | null): Promise<void> {
     setImportRows([]);
     setImportErrors([]);
@@ -321,7 +347,7 @@ export default function MenuManager({
       const firstSheetName = workbook.SheetNames[0];
       const firstSheet = firstSheetName ? workbook.Sheets[firstSheetName] : null;
       if (!firstSheet) {
-        setImportErrors(["ไม่พบ sheet ในไฟล์นี้"]);
+        setImportErrors([t("mgr.menu.import.no_sheet")]);
         return;
       }
       const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, {
@@ -329,14 +355,13 @@ export default function MenuManager({
       });
       const parsed = parseMenuImportRows(rawRows);
       setImportRows(parsed.rows);
-      setImportErrors(parsed.errors);
+      setImportErrors(formatMenuImportErrors(parsed.errors, t));
     } catch (err) {
       setImportErrors([
-        err instanceof Error ? err.message : "อ่านไฟล์ไม่สำเร็จ",
+        err instanceof Error ? err.message : t("mgr.menu.import.read_failed"),
       ]);
     }
   }
-
   async function importParsedRows(): Promise<void> {
     if (importRows.length === 0 || importBusy) return;
     setImportBusy(true);
@@ -374,7 +399,11 @@ export default function MenuManager({
 
       if (categoryError || !createdCategories) {
         setImportBusy(false);
-        setImportErrors([`สร้างหมวดหมู่ไม่สำเร็จ: ${categoryError?.message ?? ""}`]);
+        setImportErrors([
+          t("mgr.menu.import.category_failed", {
+            error: categoryError?.message ?? "",
+          }),
+        ]);
         return;
       }
 
@@ -472,11 +501,16 @@ export default function MenuManager({
       setImportRows([]);
       setImportFileName("");
       toast.success(
-        `นำเข้าเสร็จแล้ว: เพิ่มใหม่ ${insertedMenus.length} เมนู, อัปเดต ${updatedMenus.length} เมนู`,
+        t("mgr.menu.import.done", {
+          inserted: insertedMenus.length,
+          updated: updatedMenus.length,
+        }),
       );
     } catch (err) {
       setImportErrors([
-        err instanceof Error ? `นำเข้าไม่สำเร็จ: ${err.message}` : "นำเข้าไม่สำเร็จ",
+        err instanceof Error
+          ? t("mgr.menu.import.failed", { error: err.message })
+          : t("mgr.menu.import.failed", { error: "" }),
       ]);
     } finally {
       setImportBusy(false);
@@ -494,10 +528,10 @@ export default function MenuManager({
       <div className="space-y-4 lg:sticky lg:top-20 h-fit">
         <div className={`${card} ${cardPad} space-y-4 rounded-2xl border border-line/60 bg-surface shadow-sm`}>
           <SectionHeading
-            title="นำเข้าเมนูจาก Excel"
-            description="รองรับ .xlsx, .xls, .csv โดยใช้หัวคอลัมน์ category, name, price"
+            title={t("mgr.menu.import.title")}
+            description={t("mgr.menu.import.desc")}
           />
-          <FormField label="ไฟล์ Excel / CSV">
+          <FormField label={t("mgr.menu.import.file")}>
             <input
               type="file"
               accept=".xlsx,.xls,.csv"
@@ -509,8 +543,10 @@ export default function MenuManager({
             <div className="rounded-xl border border-line bg-canvas/40 px-3 py-2 text-xs text-muted">
               <div className="font-medium text-ink">{importFileName}</div>
               <div className="mt-1">
-                อ่านได้ {importRows.length} แถว
-                {importErrors.length > 0 ? `, พบปัญหา ${importErrors.length} จุด` : ""}
+                {t("mgr.menu.import.read_rows", { count: importRows.length })}
+                {importErrors.length > 0
+                  ? t("mgr.menu.import.errors_count", { count: importErrors.length })
+                  : ""}
               </div>
             </div>
           ) : null}
@@ -519,25 +555,32 @@ export default function MenuManager({
               {importErrors.slice(0, 8).map((message) => (
                 <p key={message}>{message}</p>
               ))}
-              {importErrors.length > 8 ? <p>และอีก {importErrors.length - 8} จุด</p> : null}
+              {importErrors.length > 8 ? (
+                <p>{t("mgr.menu.import.more_errors", { count: importErrors.length - 8 })}</p>
+              ) : null}
             </div>
           ) : null}
           {importRows.length > 0 ? (
             <div className="rounded-xl border border-line bg-surface">
-              <div className="grid grid-cols-[1fr_80px] border-b border-line px-3 py-2 text-[11px] font-semibold text-muted">
-                <span>ตัวอย่างเมนู</span>
-                <span className="text-right">ราคา</span>
+              <div className="grid grid-cols-[44px_minmax(0,1fr)_92px] gap-2 border-b border-line px-3 py-2 text-[11px] font-semibold text-muted">
+                <span>{t("mgr.menu.import.row")}</span>
+                <span>{t("mgr.menu.import.all_rows")}</span>
+                <span className="text-right">{t("mgr.menu.import.price")}</span>
               </div>
-              <div className="max-h-36 overflow-y-auto">
-                {importRows.slice(0, 6).map((row) => (
+              <div className="max-h-80 overflow-y-auto">
+                {importRows.map((row) => (
                   <div
                     key={`${row.rowNumber}-${row.name}`}
-                    className="grid grid-cols-[1fr_80px] gap-2 border-b border-line/60 px-3 py-2 text-xs last:border-0"
+                    className="grid grid-cols-[44px_minmax(0,1fr)_92px] gap-2 border-b border-line/60 px-3 py-2 text-xs last:border-0"
                   >
+                    <div className="text-muted tabular-nums">{row.rowNumber}</div>
                     <div className="min-w-0">
                       <div className="truncate font-medium text-ink">{row.name}</div>
                       <div className="truncate text-muted">
-                        {row.categoryName || "ไม่ระบุหมวดหมู่"}
+                        {row.categoryName || t("mgr.menu.import.uncategorized")}
+                        {row.nameLo ? ` · ${row.nameLo}` : ""}
+                        {row.nameEn ? ` · ${row.nameEn}` : ""}
+                        {!row.available ? ` · ${t("mgr.menu.import.unavailable")}` : ""}
                       </div>
                     </div>
                     <div className="text-right font-semibold tabular-nums text-ink">
@@ -554,10 +597,10 @@ export default function MenuManager({
             disabled={importBusy || importRows.length === 0 || importErrors.length > 0}
             className={`${buttonPrimary} w-full disabled:opacity-60`}
           >
-            {importBusy ? "กำลังนำเข้า..." : "นำเข้าเมนูทั้งหมด"}
+            {importBusy ? t("mgr.menu.import.importing") : t("mgr.menu.import.submit")}
           </button>
           <p className="text-[11px] leading-relaxed text-muted">
-            คอลัมน์ที่ใช้ได้: category, name, name_lo, name_en, price, available, image_url
+            {t("mgr.menu.import.columns")}
           </p>
         </div>
 
@@ -707,6 +750,26 @@ export default function MenuManager({
                     : t("mgr.menu.list_count", { n: menus.length })
                 }
               />
+              {canAct ? (
+                <button
+                  type="button"
+                  onClick={() => void deleteAllMenus()}
+                  className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 text-sm font-medium text-red-600 transition hover:bg-red-100 hover:text-red-700 active:scale-[0.98]"
+                  aria-label={t("mgr.menu.delete_all.button")}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    className="h-4 w-4"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m5 7 1 13a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-13M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3M3 7h18" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 11v6M14 11v6" />
+                  </svg>
+                  <span>{t("mgr.menu.delete_all.button")}</span>
+                </button>
+              ) : null}
             </div>
 
             <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(220px,1fr)_180px_150px_auto]">
@@ -1039,11 +1102,11 @@ function parseMenuImportRows(rawRows: Record<string, unknown>[]): {
 
     if (!primaryName && !priceRaw && !categoryName) return;
     if (!primaryName) {
-      errors.push(`แถว ${rowNumber}: ไม่มีชื่อเมนู`);
+      errors.push(`no_name:${rowNumber}`);
       return;
     }
     if (!Number.isFinite(price) || price < 0) {
-      errors.push(`แถว ${rowNumber}: ราคาไม่ถูกต้อง`);
+      errors.push(`price:${rowNumber}`);
       return;
     }
 
@@ -1060,6 +1123,22 @@ function parseMenuImportRows(rawRows: Record<string, unknown>[]): {
   });
 
   return { rows, errors };
+}
+
+function formatMenuImportErrors(
+  errors: string[],
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string[] {
+  return errors.map((error) => {
+    const [code, row] = error.split(":");
+    if (code === "no_name") {
+      return t("mgr.menu.import.error.no_name", { row });
+    }
+    if (code === "price") {
+      return t("mgr.menu.import.error.price", { row });
+    }
+    return error;
+  });
 }
 
 function normalizeImportRow(raw: Record<string, unknown>): Record<string, string> {
@@ -1461,3 +1540,5 @@ function PickerRow({ label, selected, muted, onClick }: PickerRowProps) {
     </button>
   );
 }
+
+
