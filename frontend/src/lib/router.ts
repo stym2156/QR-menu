@@ -19,6 +19,7 @@ export type Route =
         | "feedback";
     }
   | { name: "customer-menu"; restaurantId: string; tableId: string }
+  | { name: "customer-table-code"; code: string }
   | { name: "not-found" };
 
 export function parseRoute(pathname = window.location.pathname): Route {
@@ -47,6 +48,9 @@ export function parseRoute(pathname = window.location.pathname): Route {
   }
   if (parts[0] === "menu" && parts[1] && parts[2]) {
     return { name: "customer-menu", restaurantId: parts[1], tableId: parts[2] };
+  }
+  if (parts[0] === "t" && parts[1]) {
+    return { name: "customer-table-code", code: parts[1] };
   }
   return { name: "not-found" };
 }

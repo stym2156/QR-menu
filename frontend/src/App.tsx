@@ -38,6 +38,13 @@ export default function App() {
       </Suspense>
     );
   }
+  if (route.name === "customer-table-code") {
+    return (
+      <Suspense fallback={<PageLoading />}>
+        <CustomerMenuPage tableCode={route.code} />
+      </Suspense>
+    );
+  }
   if (route.name === "login") return <LoginPage />;
   if (route.name === "signup") return <SignupPage />;
   if (route.name === "home") return <PublicHome />;

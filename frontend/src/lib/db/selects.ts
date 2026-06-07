@@ -8,7 +8,7 @@ export const PROMOTION_SELECT =
   "id, restaurant_id, title, description, image_url, active, sort_order, start_at, end_at, created_at";
 
 export const TABLE_SELECT =
-  "id, restaurant_id, zone_id, table_number, qr_url, is_open, created_at";
+  "id, restaurant_id, zone_id, table_number, qr_url, short_code, is_open, created_at";
 
 export const TABLE_ZONE_SELECT =
   "id, restaurant_id, name, sort_order, created_at";

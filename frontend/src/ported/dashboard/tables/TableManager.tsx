@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { qrWithLabel } from "@/lib/qrWithLabel";
+import { customerTableUrl } from "@/lib/tableUrl";
 import { createClient } from "@/lib/supabase/client";
 import {
   EmptyState,
@@ -406,8 +407,7 @@ export default function TableManager({
   }
 
   async function downloadQR(table: DiningTable): Promise<void> {
-    const url = `${origin}/menu/${restaurantId}/${table.id}`;
-    const zone = zoneMap.get(table.zone_id);
+    const url = customerTableUrl(origin, table);
     const dataUrl = await qrWithLabel({
       url,
       label: String(table.table_number),
@@ -696,7 +696,6 @@ export default function TableManager({
                           table={table}
                           zone={zoneMap.get(table.zone_id) ?? null}
                           zones={zones}
-                          restaurantId={restaurantId}
                           origin={origin}
                           canManage={canManage}
                           canAct={canAct}
@@ -735,7 +734,6 @@ interface TableCardProps {
   table: DiningTable;
   zone: TableZone | null;
   zones: TableZone[];
-  restaurantId: string;
   origin: string;
   canManage: boolean;
   canAct: boolean;
@@ -749,7 +747,6 @@ function TableCard({
   table,
   zone,
   zones,
-  restaurantId,
   origin,
   canManage,
   canAct,
@@ -760,7 +757,7 @@ function TableCard({
 }: TableCardProps) {
   const { t } = useT();
   const [qrSrc, setQrSrc] = useState<string | null>(null);
-  const url = origin ? `${origin}/menu/${restaurantId}/${table.id}` : "";
+  const url = origin ? customerTableUrl(origin, table) : "";
 
   useEffect(() => {
     if (!url) return;
@@ -776,7 +773,7 @@ function TableCard({
     return () => {
       cancelled = true;
     };
-  }, [url, table.table_number, zone]);
+  }, [url, table.table_number]);
 
   return (
     <div

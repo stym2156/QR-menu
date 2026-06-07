@@ -22,6 +22,7 @@ export type DiningTable = {
   zone_id: string;
   table_number: number;
   qr_url: string | null;
+  short_code: string | null;
   is_open: boolean;
   created_at: string;
 };

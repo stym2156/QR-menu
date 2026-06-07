@@ -16,9 +16,11 @@ interface CustomerMenuData {
 export function CustomerMenuPage({
   restaurantId,
   tableId,
+  tableCode,
 }: {
-  restaurantId: string;
-  tableId: string;
+  restaurantId?: string;
+  tableId?: string;
+  tableCode?: string;
 }) {
   const [data, setData] = useState<CustomerMenuData | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -27,21 +29,46 @@ export function CustomerMenuPage({
     let cancelled = false;
     async function load(): Promise<void> {
       const client = supabase();
+      let resolvedRestaurantId = restaurantId ?? "";
+      let resolvedTableId = tableId ?? "";
+
+      if (tableCode) {
+        const tableByCodeResult = await client
+          .from("tables")
+          .select("*")
+          .eq("short_code", tableCode.toUpperCase())
+          .maybeSingle();
+
+        if (cancelled) return;
+        const tableByCode = tableByCodeResult.data as DiningTable | null;
+        if (!tableByCode) {
+          setNotFound(true);
+          return;
+        }
+        resolvedRestaurantId = tableByCode.restaurant_id;
+        resolvedTableId = tableByCode.id;
+      }
+
+      if (!resolvedRestaurantId || !resolvedTableId) {
+        setNotFound(true);
+        return;
+      }
+
       const [restaurantResult, tableResult, menuResult, categoryResult, promotionResult] =
         await Promise.all([
-          client.from("restaurants").select("*").eq("id", restaurantId).maybeSingle(),
-          client.from("tables").select("*").eq("id", tableId).eq("restaurant_id", restaurantId).maybeSingle(),
+          client.from("restaurants").select("*").eq("id", resolvedRestaurantId).maybeSingle(),
+          client.from("tables").select("*").eq("id", resolvedTableId).eq("restaurant_id", resolvedRestaurantId).maybeSingle(),
           client
             .from("menus")
             .select("*")
-            .eq("restaurant_id", restaurantId)
+            .eq("restaurant_id", resolvedRestaurantId)
             .eq("available", true)
             .order("created_at", { ascending: false }),
-          client.from("categories").select("*").eq("restaurant_id", restaurantId).order("sort_order"),
+          client.from("categories").select("*").eq("restaurant_id", resolvedRestaurantId).order("sort_order"),
           client
             .from("promotions")
             .select("*")
-            .eq("restaurant_id", restaurantId)
+            .eq("restaurant_id", resolvedRestaurantId)
             .eq("active", true)
             .order("sort_order"),
         ]);
@@ -79,7 +106,7 @@ export function CustomerMenuPage({
     return () => {
       cancelled = true;
     };
-  }, [restaurantId, tableId]);
+  }, [restaurantId, tableId, tableCode]);
 
   const shopOpen = useMemo(() => {
     if (!data) return true;
@@ -116,8 +143,8 @@ export function CustomerMenuPage({
       />
 
       <CustomerOrder
-        restaurantId={restaurantId}
-        tableId={tableId}
+        restaurantId={data.restaurant.id}
+        tableId={data.table.id}
         tableNumber={data.table.table_number}
         menus={data.menus}
         categories={data.categories}
