@@ -31,7 +31,11 @@ export function DashboardLayout({
             {t("nav.sign_out")}
           </button>
         </div>
-        <Sidebar role={role} restaurantName={restaurant?.name} />
+        <Sidebar
+          role={role}
+          restaurantId={restaurant?.id ?? null}
+          restaurantName={restaurant?.name}
+        />
         <main className="lg:pl-64">
           <div className="px-4 py-6 sm:px-6 sm:py-8">{children}</div>
         </main>

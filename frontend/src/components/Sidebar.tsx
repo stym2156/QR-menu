@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { LanguageSwitcher } from "../lib/i18n/LanguageSwitcher";
 import { useT } from "../lib/i18n/I18nProvider";
 import { go } from "../lib/router";
@@ -11,6 +11,7 @@ interface NavItem {
   labelKey: string;
   icon: React.ReactNode;
   allowedRoles?: Role[];
+  badge?: "kitchen" | "bills";
 }
 
 const NAV: NavItem[] = [
@@ -40,12 +41,14 @@ const NAV: NavItem[] = [
     href: "/dashboard/kitchen",
     labelKey: "nav.kitchen",
     allowedRoles: ["owner", "cook", "waiter", "staff"],
+    badge: "kitchen",
     icon: <path strokeLinecap="round" strokeLinejoin="round" d="M6 2v6M10 2v6M14 2v6M18 2v6M3 8h18l-2 13H5L3 8Z" />,
   },
   {
     href: "/dashboard/bills",
     labelKey: "nav.bills",
     allowedRoles: ["owner", "cook", "waiter", "staff"],
+    badge: "bills",
     icon: <path strokeLinecap="round" strokeLinejoin="round" d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Zm3 5h6M9 12h6M9 16h4" />,
   },
   {
@@ -92,15 +95,56 @@ function isActive(pathname: string, href: string): boolean {
 
 export function Sidebar({
   role,
+  restaurantId,
   restaurantName,
 }: {
   role: Role;
+  restaurantId: string | null;
   restaurantName?: string;
 }) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
   const [pathname, setPathname] = useState(() => window.location.pathname);
+  const [counts, setCounts] = useState({ kitchen: 0, bills: 0 });
   const items = NAV.filter((item) => (item.allowedRoles ?? ["owner"]).includes(role));
+
+  const refreshCounts = useCallback(async () => {
+    if (!restaurantId) {
+      setCounts({ kitchen: 0, bills: 0 });
+      return;
+    }
+
+    const { data } = await supabase()
+      .from("orders")
+      .select("id, table_id, status, paid")
+      .eq("restaurant_id", restaurantId)
+      .eq("paid", false);
+
+    const rows = (data ?? []) as Array<{
+      id: string;
+      table_id: string;
+      status: string;
+      paid: boolean;
+    }>;
+    const activeKitchen = rows.filter(
+      (order) => order.status === "pending" || order.status === "ready",
+    ).length;
+    const unpaidTables = new Set(
+      rows
+        .filter((order) => order.status !== "cancelled")
+        .map((order) => order.table_id),
+    ).size;
+
+    setCounts({ kitchen: activeKitchen, bills: unpaidTables });
+  }, [restaurantId]);
+
+  const badgeByType = useMemo(
+    () => ({
+      kitchen: counts.kitchen,
+      bills: counts.bills,
+    }),
+    [counts],
+  );
 
   useEffect(() => {
     const update = () => {
@@ -110,6 +154,31 @@ export function Sidebar({
     window.addEventListener("popstate", update);
     return () => window.removeEventListener("popstate", update);
   }, []);
+
+  useEffect(() => {
+    void refreshCounts();
+    if (!restaurantId) return;
+
+    const channel = supabase()
+      .channel(`sidebar-counts:${restaurantId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "orders",
+          filter: `restaurant_id=eq.${restaurantId}`,
+        },
+        () => {
+          void refreshCounts();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase().removeChannel(channel);
+    };
+  }, [restaurantId, refreshCounts]);
 
   async function signOut(): Promise<void> {
     await supabase().auth.signOut();
@@ -194,6 +263,15 @@ export function Sidebar({
                       </svg>
                     </span>
                     <span className="flex-1 truncate">{t(item.labelKey)}</span>
+                    {item.badge && badgeByType[item.badge] > 0 ? (
+                      <span
+                        className={`ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums ${
+                          active ? "bg-[#174a34] text-[#fff8e8]" : "bg-[#f4e4bd] text-[#174a34]"
+                        }`}
+                      >
+                        {badgeByType[item.badge] > 99 ? "99+" : badgeByType[item.badge]}
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               );

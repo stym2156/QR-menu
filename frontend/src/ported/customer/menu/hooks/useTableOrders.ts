@@ -30,7 +30,6 @@ export function useTableOrders({
       .eq("restaurant_id", restaurantId)
       .eq("table_id", tableId)
       .eq("paid", false)
-      .neq("status", "cancelled")
       .order("created_at", { ascending: true })
       .then(({ data }) => {
         if (!cancelled) setOrders((data ?? []) as Order[]);
