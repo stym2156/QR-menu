@@ -5,9 +5,10 @@ QR menu and restaurant ordering system. Customers scan table QR codes, order fro
 ## Current Stack
 
 - `frontend/`: Vite, React, TypeScript, Tailwind
-- `backend/`: Node.js, TypeScript, Fastify
+- `frontend/api/`: Vercel Functions for lightweight API routes
+- `backend/`: Node.js, TypeScript, Fastify fallback for separate API hosting
 - Database/Auth/Realtime: Supabase
-- Image storage: Cloudflare R2 through the backend upload API
+- Image storage: Cloudflare R2 through `/api/storage/upload`
 
 ## Project Layout
 
@@ -18,6 +19,7 @@ backend/
   .env.example         Backend env template
 
 frontend/
+  api/                 Vercel API functions
   src/                 React app
   public/              Frontend static assets
   .env.example         Frontend env template
@@ -34,7 +36,25 @@ copy frontend\.env.example frontend\.env
 
 Put secrets only in `.env` files. They are ignored by Git.
 
-Backend needs Supabase and R2 values:
+Vercel frontend/API needs public Supabase client values plus private R2 values:
+
+```env
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+VITE_API_URL=
+VITE_IMAGE_STORAGE_DRIVER=r2
+
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+IMAGE_STORAGE_DRIVER=r2
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET_NAME=
+R2_PUBLIC_BASE_URL=
+```
+
+If you run the optional Fastify backend separately, it needs:
 
 ```env
 SUPABASE_URL=
@@ -48,7 +68,7 @@ R2_BUCKET_NAME=
 R2_PUBLIC_BASE_URL=
 ```
 
-Frontend needs public client values:
+For local frontend development with the separate Fastify backend, set:
 
 ```env
 VITE_API_URL=http://localhost:4000
@@ -76,6 +96,16 @@ on conflict do nothing;
 ```
 
 ## Local Development
+
+Run frontend only. It can call same-origin Vercel Functions when deployed:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+For local R2 upload testing with the existing Fastify backend, run backend too and set `VITE_API_URL=http://localhost:4000`:
 
 Run backend:
 
@@ -105,6 +135,12 @@ Backend health check:
 http://localhost:4000/health
 ```
 
+Vercel API health check after deploy:
+
+```text
+/api/health
+```
+
 ## Build
 
 ```bash
@@ -120,5 +156,6 @@ npm run build
 ## Notes
 
 - Do not commit `.env`, `.env.local`, `dist`, logs, or `node_modules`.
-- Image uploads go through `POST /api/storage/upload` on the backend, then to Cloudflare R2.
+- Image uploads go through `POST /api/storage/upload`, then to Cloudflare R2.
+- On Vercel, deploy `frontend/` as the project root with build command `npm run build` and output directory `dist`.
 - Keep `backend/supabase/setup_all.sql` in sync with migration files when adding database changes.
