@@ -21,8 +21,6 @@ frontend/
   src/                 React app
   public/              Frontend static assets
   .env.example         Frontend env template
-
-docs/                  Extra setup notes
 ```
 
 ## Environment
