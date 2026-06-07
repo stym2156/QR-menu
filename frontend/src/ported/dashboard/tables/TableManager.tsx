@@ -136,8 +136,8 @@ export default function TableManager({
     if (insertError || !data) {
       const message =
         insertError?.code === "23505"
-          ? `มีโซนชื่อ "${name}" อยู่แล้ว`
-          : `เพิ่มโซนไม่สำเร็จ: ${insertError?.message ?? ""}`;
+          ? t("mgr.tbl.zone.exists", { name })
+          : t("mgr.tbl.zone.add_failed", { error: insertError?.message ?? "" });
       setZoneError(message);
       return;
     }
@@ -146,18 +146,18 @@ export default function TableManager({
     setSelectedZoneId(zone.id);
     setZoneFilter("all");
     setNewZoneName("");
-    toast.success(`เพิ่มโซน ${zone.name} แล้ว`);
+    toast.success(t("mgr.tbl.zone.added", { name: zone.name }));
   }
 
   async function deleteZone(zone: TableZone): Promise<void> {
     const usedCount = tables.filter((table) => table.zone_id === zone.id).length;
     if (usedCount > 0) {
-      toast.error(`ยังลบโซนนี้ไม่ได้ เพราะมี ${usedCount} โต๊ะอยู่ในโซน`);
+      toast.error(t("mgr.tbl.zone.delete_has_tables", { count: usedCount }));
       return;
     }
     const ok = await confirm({
-      title: `ลบโซน "${zone.name}"?`,
-      description: "โต๊ะในโซนนี้ต้องถูกย้ายหรือลบออกก่อน จึงจะลบโซนได้",
+      title: t("mgr.tbl.zone.delete.title", { name: zone.name }),
+      description: t("mgr.tbl.zone.delete.desc"),
       confirmText: t("common.delete"),
       tone: "danger",
     });
@@ -167,13 +167,13 @@ export default function TableManager({
       .delete()
       .eq("id", zone.id);
     if (deleteError) {
-      toast.error(`ลบโซนไม่สำเร็จ: ${deleteError.message}`);
+      toast.error(t("mgr.tbl.zone.delete_failed", { error: deleteError.message }));
       return;
     }
     setZones((prev) => prev.filter((z) => z.id !== zone.id));
     if (selectedZoneId === zone.id) setSelectedZoneId(zones.find((z) => z.id !== zone.id)?.id ?? "");
     if (zoneFilter === zone.id) setZoneFilter("all");
-    toast.success(`ลบโซน ${zone.name} แล้ว`);
+    toast.success(t("mgr.tbl.zone.deleted", { name: zone.name }));
   }
 
   async function moveTableToZone(table: DiningTable, zoneId: string): Promise<void> {
@@ -187,7 +187,10 @@ export default function TableManager({
     );
     if (duplicate) {
       toast.error(
-        `ย้ายไม่ได้: มีโต๊ะ ${table.table_number} ในโซน ${targetZone?.name ?? ""} อยู่แล้ว`,
+        t("mgr.tbl.zone.move_duplicate", {
+          n: table.table_number,
+          zone: targetZone?.name ?? "",
+        }),
       );
       return;
     }
@@ -203,10 +206,10 @@ export default function TableManager({
       setTables((prev) =>
         prev.map((x) => (x.id === table.id ? { ...x, zone_id: previousZoneId } : x)),
       );
-      toast.error(`ย้ายโซนไม่สำเร็จ: ${updateError.message}`);
+      toast.error(t("mgr.tbl.zone.move_failed", { error: updateError.message }));
       return;
     }
-    toast.success(`ย้ายโต๊ะ ${table.table_number} แล้ว`);
+    toast.success(t("mgr.tbl.zone.moved", { n: table.table_number }));
   }
 
   async function handleAdd(e: React.FormEvent): Promise<void> {
@@ -221,7 +224,7 @@ export default function TableManager({
       return;
     }
     if (!selectedZoneId) {
-      setError("กรุณาเพิ่มหรือเลือกโซนก่อนเพิ่มโต๊ะ");
+      setError(t("mgr.tbl.zone.required"));
       setBusy(false);
       return;
     }
@@ -231,7 +234,10 @@ export default function TableManager({
     );
     if (duplicate) {
       setError(
-        `โต๊ะ ${num} มีอยู่แล้วในโซน ${selectedZone?.name ?? ""} ถ้าต้องการเลขซ้ำ ให้เลือกคนละโซนก่อนเพิ่ม`,
+        t("mgr.tbl.zone.table_duplicate_hint", {
+          n: num,
+          zone: selectedZone?.name ?? "",
+        }),
       );
       setBusy(false);
       return;
@@ -250,7 +256,10 @@ export default function TableManager({
     if (insertError || !data) {
       const message =
         insertError?.code === "23505"
-          ? `โต๊ะ ${num} มีอยู่แล้วในโซน ${selectedZone?.name ?? ""}`
+          ? t("mgr.tbl.zone.table_duplicate", {
+              n: num,
+              zone: selectedZone?.name ?? "",
+            })
           : t("mgr.tbl.add_failed", { error: insertError?.message ?? "" });
       setError(message);
       setBusy(false);
@@ -445,15 +454,15 @@ export default function TableManager({
         <div className="space-y-4 lg:sticky lg:top-20 lg:h-fit">
           <form onSubmit={handleAddZone} className={`${card} ${cardPad} space-y-4`}>
             <SectionHeading
-              title="โซน"
-              description="เช่น ชั้น 1, ชั้น 2, VIP, โซน A"
+              title={t("mgr.tbl.zone.title")}
+              description={t("mgr.tbl.zone.desc")}
             />
-            <FormField label="ชื่อโซน">
+            <FormField label={t("mgr.tbl.zone.name")}>
               <input
                 value={newZoneName}
                 onChange={(e) => setNewZoneName(e.target.value)}
                 className={input}
-                placeholder="ชั้น 1"
+                placeholder={t("mgr.tbl.zone.placeholder")}
               />
             </FormField>
             <button
@@ -461,7 +470,7 @@ export default function TableManager({
               disabled={zoneBusy || !newZoneName.trim()}
               className={`${buttonSecondary} w-full`}
             >
-              {zoneBusy ? "กำลังเพิ่ม..." : "+ เพิ่มโซน"}
+              {zoneBusy ? t("mgr.tbl.zone.adding") : t("mgr.tbl.zone.add")}
             </button>
             {zoneError ? (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -500,7 +509,7 @@ export default function TableManager({
               </div>
             ) : (
               <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                ยังไม่มีโซน ถ้าเพิ่งอัปเดตระบบ กรุณารัน SQL migration ก่อน
+                {t("mgr.tbl.zone.empty_hint")}
               </p>
             )}
           </form>
@@ -508,7 +517,7 @@ export default function TableManager({
           <form onSubmit={handleAdd} className={`${card} ${cardPad} space-y-4`}>
             <SectionHeading title={t("mgr.tbl.add_title")} />
 
-            <FormField label="โซน">
+            <FormField label={t("mgr.tbl.zone.title")}>
               <select
                 value={selectedZoneId}
                 onChange={(e) => setSelectedZoneId(e.target.value)}
@@ -516,7 +525,7 @@ export default function TableManager({
                 className={input}
               >
                 <option value="" disabled>
-                  เลือกโซน
+                  {t("mgr.tbl.zone.select")}
                 </option>
                 {zones.map((zone) => (
                   <option key={zone.id} value={zone.id}>
@@ -637,7 +646,7 @@ export default function TableManager({
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="ค้นหาเลขโต๊ะหรือโซน..."
+                  placeholder={t("mgr.tbl.search.placeholder")}
                   className={`${input} pl-10 pr-10`}
                   autoComplete="off"
                 />
@@ -659,7 +668,7 @@ export default function TableManager({
                 onChange={(e) => setZoneFilter(e.target.value)}
                 className={`${input} sm:w-52`}
               >
-                <option value="all">ทุกโซน</option>
+                <option value="all">{t("mgr.tbl.zone.all")}</option>
                 {zones.map((zone) => (
                   <option key={zone.id} value={zone.id}>
                     {zone.name}
@@ -670,15 +679,15 @@ export default function TableManager({
 
             {filteredTables.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-line bg-surface/50 p-8 text-center text-sm text-muted">
-                ไม่พบโต๊ะที่ตรงกับตัวกรอง
+                {t("mgr.tbl.search.no_filter_match")}
               </div>
             ) : (
               <div className="space-y-5">
                 {groupedTables.map((group) => (
                   <section key={group.zone?.id ?? "unknown"}>
                     <SectionHeading
-                      title={group.zone?.name ?? "ไม่ระบุโซน"}
-                      description={`${group.tables.length} โต๊ะ`}
+                      title={group.zone?.name ?? t("mgr.tbl.zone.unknown")}
+                      description={t("mgr.tbl.zone.table_count", { count: group.tables.length })}
                     />
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                       {group.tables.map((table) => (
@@ -800,7 +809,7 @@ function TableCard({
               )}
             </div>
             <div className="mt-1 truncate text-xs text-muted">
-              {zone?.name ?? "ไม่ระบุโซน"}
+              {zone?.name ?? t("mgr.tbl.zone.unknown")}
             </div>
           </div>
         </div>
@@ -819,7 +828,7 @@ function TableCard({
           value={table.zone_id}
           onChange={(e) => onMoveZone(e.target.value)}
           className={`${input} mb-3 py-2 text-xs`}
-          aria-label="ย้ายโซน"
+          aria-label={t("mgr.tbl.zone.move")}
         >
           {zones.map((z) => (
             <option key={z.id} value={z.id}>

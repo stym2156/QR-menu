@@ -5,19 +5,19 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        canvas: "#fafaf9",
-        surface: "#ffffff",
-        ink: "#09090b",
-        muted: "#71717a",
-        line: "#e7e5e4",
+        canvas: "#efe7d8",
+        surface: "#fffaf0",
+        ink: "#174a34",
+        muted: "#766b5b",
+        line: "#d5c4aa",
         accent: {
-          50: "#eef2ff",
-          100: "#e0e7ff",
-          400: "#818cf8",
-          500: "#6366f1",
-          600: "#4f46e5",
-          700: "#4338ca",
-          900: "#312e81",
+          50: "#ecfdf5",
+          100: "#d1fae5",
+          400: "#34d399",
+          500: "#10b981",
+          600: "#059669",
+          700: "#047857",
+          900: "#064e3b",
         },
         brand: {
           50: "#fff7ed",
@@ -40,9 +40,9 @@ const config: Config = {
         tight: "-0.02em",
       },
       boxShadow: {
-        card: "0 1px 2px rgba(0,0,0,0.04), 0 1px 1px rgba(0,0,0,0.02)",
-        pop: "0 8px 24px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04)",
-        ink: "0 1px 0 rgba(255,255,255,0.06) inset, 0 6px 20px rgba(9,9,11,0.18)",
+        card: "0 1px 2px rgba(92,68,35,0.14), 0 8px 20px rgba(92,68,35,0.08)",
+        pop: "0 12px 32px rgba(67,47,23,0.18), 0 2px 8px rgba(67,47,23,0.10)",
+        ink: "0 1px 0 rgba(255,255,255,0.14) inset, 0 8px 22px rgba(23,74,52,0.24)",
       },
       animation: {
         "slide-up": "slide-up 0.3s cubic-bezier(0.32, 0.72, 0, 1)",

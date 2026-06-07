@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "../components/ui";
+import { useT } from "../lib/i18n/I18nProvider";
 import { supabase } from "../lib/supabase";
 import type { Category } from "../lib/types";
 import CategoryManager from "../ported/dashboard/categories/CategoryManager";
 
 export function CategoriesPage({ restaurantId }: { restaurantId: string }) {
+  const { t } = useT();
   const [categories, setCategories] = useState<Category[] | null>(null);
 
   useEffect(() => {
@@ -23,15 +25,12 @@ export function CategoriesPage({ restaurantId }: { restaurantId: string }) {
   }, [restaurantId]);
 
   if (!categories) {
-    return <div className="text-sm text-muted">Loading...</div>;
+    return <div className="text-sm text-muted">{t("common.loading")}</div>;
   }
 
   return (
     <>
-      <PageHeader
-        title="หมวดหมู่เมนู"
-        description="จัดกลุ่มเมนูเป็นหมวด เช่น อาหาร / เครื่องดื่ม / ของหวาน"
-      />
+      <PageHeader title={t("page.categories.title")} description={t("page.categories.desc")} />
       <CategoryManager restaurantId={restaurantId} initialCategories={categories} />
     </>
   );

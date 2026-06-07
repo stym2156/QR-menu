@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "../components/ui";
+import { useT } from "../lib/i18n/I18nProvider";
 import { supabase } from "../lib/supabase";
 import type { DiningTable, TableZone } from "../lib/types";
 import TableManager from "../ported/dashboard/tables/TableManager";
 
 export function TablesPage({ restaurantId }: { restaurantId: string }) {
+  const { t } = useT();
   const [state, setState] = useState<{
     tables: DiningTable[];
     zones: TableZone[];
@@ -39,15 +41,12 @@ export function TablesPage({ restaurantId }: { restaurantId: string }) {
   }, [restaurantId]);
 
   if (!state) {
-    return <div className="text-sm text-muted">Loading...</div>;
+    return <div className="text-sm text-muted">{t("common.loading")}</div>;
   }
 
   return (
     <>
-      <PageHeader
-        title="โต๊ะ & QR Code"
-        description="สร้าง QR สำหรับแต่ละโต๊ะ ลูกค้าสแกนเพื่อสั่งอาหาร"
-      />
+      <PageHeader title={t("page.tables.title")} description={t("page.tables.desc.owner")} />
       <TableManager
         restaurantId={restaurantId}
         initialTables={state.tables}

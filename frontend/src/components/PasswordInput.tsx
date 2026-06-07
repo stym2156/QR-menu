@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useT } from "../lib/i18n/I18nProvider";
 import { input } from "./ui";
 
 interface PasswordInputProps {
@@ -16,10 +17,11 @@ export function PasswordInput({
   onChange,
   autoComplete = "current-password",
   required,
-  placeholder = "••••••••",
+  placeholder = "********",
   name = "password",
   id,
 }: PasswordInputProps) {
+  const { t } = useT();
   const [visible, setVisible] = useState(false);
 
   return (
@@ -38,7 +40,7 @@ export function PasswordInput({
       <button
         type="button"
         onClick={() => setVisible((v) => !v)}
-        aria-label={visible ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+        aria-label={visible ? t("password.hide") : t("password.show")}
         aria-pressed={visible}
         tabIndex={-1}
         className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-muted transition hover:bg-canvas hover:text-ink"

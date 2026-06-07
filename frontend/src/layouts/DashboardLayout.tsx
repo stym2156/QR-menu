@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Sidebar } from "../components/Sidebar";
 import { SoundProvider } from "../components/SoundProvider";
+import { useT } from "../lib/i18n/I18nProvider";
 import { go } from "../lib/router";
 import { supabase } from "../lib/supabase";
 import type { Restaurant, Role } from "../lib/types";
@@ -14,10 +15,12 @@ export function DashboardLayout({
   role: Role;
   restaurant: Restaurant | null;
 }) {
+  const { t } = useT();
+
   return (
     <SoundProvider restaurantId={restaurant?.id ?? null}>
       <div className="min-h-screen bg-canvas text-ink">
-        <div className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-line bg-surface/95 px-4 lg:hidden">
+        <div className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-line bg-surface/95 px-4 shadow-card backdrop-blur lg:hidden">
           <button onClick={() => go("/dashboard")} className="font-semibold text-ink">
             QR Menu
           </button>
@@ -25,7 +28,7 @@ export function DashboardLayout({
             onClick={() => void supabase().auth.signOut().then(() => go("/login"))}
             className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-muted"
           >
-            Sign out
+            {t("nav.sign_out")}
           </button>
         </div>
         <Sidebar role={role} restaurantName={restaurant?.name} />

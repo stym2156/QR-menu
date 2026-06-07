@@ -118,7 +118,7 @@ export function Sidebar({
 
   return (
     <>
-      <div className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line bg-surface/95 px-4 backdrop-blur lg:hidden">
+      <div className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-line bg-surface/95 px-4 shadow-card backdrop-blur lg:hidden">
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -144,18 +144,18 @@ export function Sidebar({
       ) : null}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-line bg-surface transition-transform lg:translate-x-0 ${
+        className={`sidebar-shell fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-white/10 text-white shadow-pop transition-transform lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-line px-5 py-4">
-          <button onClick={() => go("/dashboard")} className="text-base font-semibold tracking-tight text-ink">
+        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+          <button onClick={() => go("/dashboard")} className="text-base font-semibold tracking-tight text-white">
             QR Menu
           </button>
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-canvas hover:text-ink lg:hidden"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-white/60 hover:bg-white/10 hover:text-white lg:hidden"
             aria-label={t("nav.close_menu")}
           >
             x
@@ -163,10 +163,10 @@ export function Sidebar({
         </div>
 
         {restaurantName ? (
-          <div className="border-b border-line px-5 py-3">
-            <p className="truncate text-xs font-medium text-ink">{restaurantName}</p>
+          <div className="border-b border-white/10 px-5 py-3">
+            <p className="truncate text-xs font-medium text-white">{restaurantName}</p>
             {role !== "owner" ? (
-              <p className="mt-1 inline-block rounded-full bg-canvas px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted">
+              <p className="mt-1 inline-block rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-white/65">
                 {role}
               </p>
             ) : null}
@@ -183,7 +183,9 @@ export function Sidebar({
                     type="button"
                     onClick={() => go(item.href)}
                     className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition ${
-                      active ? "bg-ink text-surface" : "text-muted hover:bg-canvas hover:text-ink"
+                      active
+                        ? "bg-[#f4e4bd] text-[#174a34] shadow-ink ring-1 ring-[#f8e9c6]/70"
+                        : "text-[#f7ead2]/85 hover:bg-[#f4e4bd]/12 hover:text-[#fff8e8]"
                     }`}
                   >
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center">
@@ -199,7 +201,7 @@ export function Sidebar({
           </ul>
         </nav>
 
-        <div className="space-y-2 border-t border-line px-3 py-3">
+        <div className="space-y-2 border-t border-white/10 px-3 py-3">
           <div className="flex items-center justify-between gap-2 px-2">
             <LanguageSwitcher variant="compact" />
             <SoundToggle />
@@ -207,7 +209,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={() => void signOut()}
-            className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-muted transition hover:bg-canvas hover:text-ink"
+            className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#f7ead2]/85 transition hover:bg-[#f4e4bd]/12 hover:text-[#fff8e8]"
           >
             {t("nav.sign_out")}
           </button>

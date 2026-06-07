@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { PageHeader, LinkButton } from "../components/ui";
+import { useT } from "../lib/i18n/I18nProvider";
 import { supabase } from "../lib/supabase";
 import type { Category, Menu } from "../lib/types";
 import MenuManager from "../ported/dashboard/menu/MenuManager";
 
 export function MenuPage({ restaurantId }: { restaurantId: string }) {
+  const { t } = useT();
   const [state, setState] = useState<{
     menus: Menu[];
     categories: Category[];
@@ -39,15 +41,15 @@ export function MenuPage({ restaurantId }: { restaurantId: string }) {
   }, [restaurantId]);
 
   if (!state) {
-    return <div className="text-sm text-muted">Loading...</div>;
+    return <div className="text-sm text-muted">{t("common.loading")}</div>;
   }
 
   return (
     <>
       <PageHeader
-        title="เมนู"
-        description="เพิ่ม / แก้ไข / ลบรายการอาหาร"
-        action={<LinkButton href="/dashboard/categories">จัดการหมวดหมู่</LinkButton>}
+        title={t("page.menu.title")}
+        description={t("page.menu.desc")}
+        action={<LinkButton href="/dashboard/categories">{t("page.menu.manage_categories")}</LinkButton>}
       />
       <MenuManager
         restaurantId={restaurantId}
