@@ -249,7 +249,7 @@ function buildR2ObjectKey(bucket, path) {
 }
 
 function getRestaurantIdFromPath(path) {
-  const firstSegment = path.split("/")[0];
+  const firstSegment = path.split("/")[0]?.trim();
   return isUuid(firstSegment) ? firstSegment : null;
 }
 
@@ -260,7 +260,7 @@ function isSafeObjectPath(path) {
 function isUuid(value) {
   return Boolean(
     value &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         value,
       ),
   );
