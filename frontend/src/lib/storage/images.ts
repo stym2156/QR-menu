@@ -44,11 +44,12 @@ export async function uploadPublicImage(
       body: form,
     });
     const result = (await response.json().catch(() => null)) as
-      | { publicUrl?: string; error?: string }
+      | { publicUrl?: string; error?: string; code?: string }
       | null;
 
     if (!response.ok || !result?.publicUrl) {
-      return { error: result?.error ?? "Upload failed" };
+      const message = result?.error ?? "Upload failed";
+      return { error: result?.code ? `${result.code}: ${message}` : message };
     }
     return { publicUrl: result.publicUrl };
   }

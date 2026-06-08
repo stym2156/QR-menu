@@ -11,10 +11,15 @@ export const config = {
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([
   "image/jpeg",
+  "image/jpg",
+  "image/pjpeg",
   "image/png",
+  "image/x-png",
   "image/webp",
   "image/gif",
   "image/svg+xml",
+  "image/heic",
+  "image/heif",
 ]);
 
 const PUBLIC_BUCKET_PREFIX = {
@@ -26,24 +31,24 @@ const PUBLIC_BUCKET_PREFIX = {
 export default async function handler(request, response) {
   if (request.method !== "POST") {
     response.setHeader("Allow", "POST");
-    return response.status(405).json({ error: "Method not allowed" });
+    return sendError(response, 405, "METHOD_NOT_ALLOWED", "Method not allowed");
   }
 
-  if ((process.env.IMAGE_STORAGE_DRIVER ?? "r2") !== "r2") {
-    return response.status(400).json({ error: "R2 storage is not enabled" });
+  if ((process.env.IMAGE_STORAGE_DRIVER ?? "r2").toLowerCase() !== "r2") {
+    return sendError(response, 400, "R2_DISABLED", "R2 storage is not enabled");
   }
 
   const env = readEnv();
   if (!env.r2) {
-    return response.status(500).json({ error: "R2 is not configured" });
+    return sendError(response, 500, "R2_NOT_CONFIGURED", "R2 is not configured");
   }
   if (!env.supabaseUrl || !env.supabaseAnonKey) {
-    return response.status(500).json({ error: "Supabase is not configured" });
+    return sendError(response, 500, "SUPABASE_NOT_CONFIGURED", "Supabase is not configured");
   }
 
   const token = getBearerToken(request);
   if (!token) {
-    return response.status(401).json({ error: "Unauthorized" });
+    return sendError(response, 401, "UNAUTHORIZED", "Unauthorized");
   }
 
   const supabase = createClient(env.supabaseUrl, env.supabaseAnonKey, {
@@ -51,31 +56,35 @@ export default async function handler(request, response) {
   });
   const { data: userData, error: userError } = await supabase.auth.getUser(token);
   if (userError || !userData.user) {
-    return response.status(401).json({ error: "Unauthorized" });
+    return sendError(response, 401, "UNAUTHORIZED", "Unauthorized");
   }
 
   const upload = await readMultipartUpload(request).catch((error) => ({
     error: error instanceof Error ? error.message : "Invalid upload",
   }));
   if ("error" in upload) {
-    return response.status(400).json({ error: upload.error });
+    return sendError(response, 400, "INVALID_MULTIPART", upload.error);
   }
 
   if (!upload.file) {
-    return response.status(400).json({ error: "Missing file" });
+    return sendError(response, 400, "MISSING_FILE", "Missing file", upload.fields);
   }
-  if (!ALLOWED_TYPES.has(upload.file.mimeType)) {
-    return response.status(400).json({ error: "Unsupported image type" });
+  const mimeType = normalizeMimeType(upload.file.mimeType);
+  if (!ALLOWED_TYPES.has(mimeType)) {
+    return sendError(response, 400, "UNSUPPORTED_IMAGE_TYPE", "Unsupported image type", {
+      mimeType: upload.file.mimeType,
+      filename: upload.file.filename,
+    });
   }
 
   const key = buildR2ObjectKey(upload.fields.bucket, upload.fields.path);
   if (!key) {
-    return response.status(400).json({ error: "Invalid upload path" });
+    return sendError(response, 400, "INVALID_UPLOAD_PATH", "Invalid upload path", upload.fields);
   }
 
   const restaurantId = getRestaurantIdFromPath(upload.fields.path);
   if (!restaurantId) {
-    return response.status(400).json({ error: "Invalid upload path" });
+    return sendError(response, 400, "INVALID_RESTAURANT_ID", "Invalid upload path", upload.fields);
   }
 
   const userSupabase = createClient(env.supabaseUrl, env.supabaseAnonKey, {
@@ -95,7 +104,11 @@ export default async function handler(request, response) {
     .maybeSingle();
 
   if (membershipError || membership?.role !== "owner") {
-    return response.status(403).json({ error: "Forbidden" });
+    return sendError(response, 403, "FORBIDDEN", "Forbidden", {
+      restaurantId,
+      userId: userData.user.id,
+      membershipError: membershipError?.message,
+    });
   }
 
   const client = new S3Client({
@@ -113,7 +126,7 @@ export default async function handler(request, response) {
       Key: key,
       Body: upload.file.buffer,
       ContentLength: upload.file.buffer.byteLength,
-      ContentType: upload.file.mimeType || "application/octet-stream",
+      ContentType: mimeType || "application/octet-stream",
       CacheControl: "public, max-age=31536000, immutable",
     }),
   );
@@ -150,6 +163,18 @@ function readEnv() {
 
 function allPresent(...values) {
   return values.every((value) => typeof value === "string" && value.trim());
+}
+
+function sendError(response, status, code, error, details) {
+  console.warn("[upload]", code, details ?? "");
+  return response.status(status).json({ code, error });
+}
+
+function normalizeMimeType(mimeType) {
+  const value = String(mimeType || "").toLowerCase();
+  if (value === "image/jpg" || value === "image/pjpeg") return "image/jpeg";
+  if (value === "image/x-png") return "image/png";
+  return value;
 }
 
 function getBearerToken(request) {
