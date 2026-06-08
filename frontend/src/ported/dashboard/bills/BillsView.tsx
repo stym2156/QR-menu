@@ -312,34 +312,45 @@ export default function BillsView({
             {t("kit.calls.section", { n: calls.length })}
           </div>
           <ul className="space-y-1.5">
-            {calls.map((call) => (
-              <li
-                key={call.id}
-                className="flex items-center justify-between gap-3 rounded-lg bg-surface px-3 py-2"
-              >
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-ink">
-                    {t("kit.calls.table_n", {
-                      n: tableMap.get(call.table_id)?.table_number ?? "?",
-                    })}
-                    <span className="ml-2 text-xs font-normal text-muted">
-                      {formatTime(call.created_at)}
-                    </span>
+            {calls.map((call) => {
+              const table = tableMap.get(call.table_id);
+              const zoneName =
+                zoneNameForTable(table) ?? t("mgr.tbl.zone.unknown");
+
+              return (
+                <li
+                  key={call.id}
+                  className="flex items-center justify-between gap-3 rounded-lg bg-surface px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-ink">
+                      <span>
+                        {t("kit.calls.table_n", {
+                          n: table?.table_number ?? "?",
+                        })}
+                      </span>
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+                        {t("mgr.tbl.zone.title")}: {zoneName}
+                      </span>
+                      <span className="text-xs font-normal text-muted">
+                        {formatTime(call.created_at)}
+                      </span>
+                    </div>
+                    <div className="truncate text-xs text-muted">
+                      {call.reason || t("kit.calls.unknown")}
+                    </div>
                   </div>
-                  <div className="truncate text-xs text-muted">
-                    {call.reason || t("kit.calls.unknown")}
-                  </div>
-                </div>
-                {canAct ? (
-                  <button
-                    onClick={() => ackCall(call)}
-                    className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-surface hover:bg-emerald-700"
-                  >
-                    {t("kit.calls.ack")}
-                  </button>
-                ) : null}
-              </li>
-            ))}
+                  {canAct ? (
+                    <button
+                      onClick={() => ackCall(call)}
+                      className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-surface hover:bg-emerald-700"
+                    >
+                      {t("kit.calls.ack")}
+                    </button>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}
