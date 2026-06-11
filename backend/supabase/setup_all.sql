@@ -341,6 +341,19 @@ $$;
 
 grant execute on function public.find_user_id_by_email(text) to authenticated;
 
+create or replace function public.find_user_by_phone(phone_input text)
+returns table (user_id uuid, email text)
+language sql security definer stable set search_path = public
+as $$
+  select u.id as user_id, u.email
+  from auth.users u
+  where regexp_replace(coalesce(u.raw_user_meta_data->>'phone', ''), '[^0-9]+', '', 'g')
+      = regexp_replace(coalesce(phone_input, ''), '[^0-9]+', '', 'g')
+  limit 1;
+$$;
+
+grant execute on function public.find_user_by_phone(text) to anon, authenticated;
+
 -- ============================================================
 -- RLS policies (consolidated, membership-based)
 -- ============================================================

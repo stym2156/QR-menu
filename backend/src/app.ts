@@ -4,6 +4,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import type { BackendEnv } from "./config/env";
 import { createSupabaseClients, type SupabaseClients } from "./plugins/supabase";
 import { registerHealthRoutes } from "./routes/health";
+import { registerAuthRoutes } from "./routes/auth";
 import { registerStorageRoutes } from "./routes/storage";
 
 declare module "fastify" {
@@ -28,6 +29,7 @@ export async function createApp(env: BackendEnv): Promise<FastifyInstance> {
   await app.register(multipart);
 
   await app.register(registerHealthRoutes, env);
+  await app.register(registerAuthRoutes, env);
   await app.register(registerStorageRoutes, env);
 
   app.setNotFoundHandler(async (_request, reply) => {

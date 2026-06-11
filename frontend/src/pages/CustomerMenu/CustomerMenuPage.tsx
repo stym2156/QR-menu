@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import { supabase } from "../lib/supabase";
-import type { Category, DiningTable, Menu, Promotion, Restaurant, TableZone } from "../lib/types";
-import CustomerHeader from "../ported/customer/menu/CustomerHeader";
-import CustomerOrder from "../ported/customer/menu/CustomerOrder";
+﻿import { useEffect, useMemo, useState } from "react";
+import { supabase } from "../../lib/supabase";
+import type { Category, DiningTable, Menu, Promotion, Restaurant, TableZone } from "../../lib/types";
+import CustomerHeader from "../../ported/customer/menu/CustomerHeader";
+import CustomerOrder from "../../ported/customer/menu/CustomerOrder";
 
 interface CustomerMenuData {
   restaurant: Restaurant;
@@ -156,3 +156,4 @@ export function CustomerMenuPage({
     </main>
   );
 }
+

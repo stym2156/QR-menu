@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
-import { PageHeader, LinkButton } from "../components/ui";
-import { useT } from "../lib/i18n/I18nProvider";
-import { supabase } from "../lib/supabase";
-import type { Category, Menu } from "../lib/types";
-import MenuManager from "../ported/dashboard/menu/MenuManager";
+﻿import { useEffect, useState } from "react";
+import { PageHeader, LinkButton } from "../../components/ui";
+import { useT } from "../../lib/i18n/I18nProvider";
+import { supabase } from "../../lib/supabase";
+import type { Category, Menu } from "../../lib/types";
+import MenuManager from "../../ported/dashboard/menu/MenuManager";
 
 export function MenuPage({ restaurantId }: { restaurantId: string }) {
   const { t } = useT();
@@ -60,3 +60,4 @@ export function MenuPage({ restaurantId }: { restaurantId: string }) {
     </>
   );
 }
+

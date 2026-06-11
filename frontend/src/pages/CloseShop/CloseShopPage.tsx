@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
-import { MENU_SELECT, ORDER_SELECT } from "../lib/db/selects";
-import { supabase } from "../lib/supabase";
-import type { Menu, Order } from "../lib/types";
-import CloseShopView from "../ported/dashboard/close-shop/CloseShopView";
+﻿import { useEffect, useState } from "react";
+import { MENU_SELECT, ORDER_SELECT } from "../../lib/db/selects";
+import { supabase } from "../../lib/supabase";
+import type { Menu, Order } from "../../lib/types";
+import CloseShopView from "../../ported/dashboard/close-shop/CloseShopView";
 
 interface CloseShopData {
   orders: Order[];
@@ -48,3 +48,4 @@ export function CloseShopPage({ restaurantId }: { restaurantId: string }) {
     </div>
   );
 }
+

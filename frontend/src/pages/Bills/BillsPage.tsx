@@ -1,15 +1,15 @@
-import { useEffect, useState } from "react";
-import I18nPageHeader from "../components/I18nPageHeader";
+﻿import { useEffect, useState } from "react";
+import I18nPageHeader from "../../components/I18nPageHeader";
 import {
   CALL_STAFF_SELECT,
   MENU_SELECT,
   ORDER_SELECT,
   TABLE_SELECT,
   TABLE_ZONE_SELECT,
-} from "../lib/db/selects";
-import { supabase } from "../lib/supabase";
-import type { CallStaffRequest, DiningTable, Menu, Order, Role, TableZone } from "../lib/types";
-import BillsView from "../ported/dashboard/bills/BillsView";
+} from "../../lib/db/selects";
+import { supabase } from "../../lib/supabase";
+import type { CallStaffRequest, DiningTable, Menu, Order, Role, TableZone } from "../../lib/types";
+import BillsView from "../../ported/dashboard/bills/BillsView";
 
 interface BillsData {
   restaurantName: string;
@@ -135,3 +135,4 @@ export function BillsPage({
     </div>
   );
 }
+

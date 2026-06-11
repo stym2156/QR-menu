@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import {
   CATEGORY_SELECT,
   MENU_SELECT,
   ORDER_SELECT,
   TABLE_SELECT,
   TABLE_ZONE_SELECT,
-} from "../lib/db/selects";
-import { supabase } from "../lib/supabase";
-import type { Category, DiningTable, Menu, Order, TableZone } from "../lib/types";
-import StatsView from "../ported/dashboard/stats/StatsView";
+} from "../../lib/db/selects";
+import { supabase } from "../../lib/supabase";
+import type { Category, DiningTable, Menu, Order, TableZone } from "../../lib/types";
+import StatsView from "../../ported/dashboard/stats/StatsView";
 
 interface StatsData {
   orders: Order[];
@@ -84,3 +84,4 @@ export function StatsPage({ restaurantId }: { restaurantId: string }) {
     />
   );
 }
+

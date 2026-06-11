@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
-import { PageHeader } from "../components/ui";
-import { useT } from "../lib/i18n/I18nProvider";
-import { supabase } from "../lib/supabase";
-import type { DiningTable, TableZone } from "../lib/types";
-import TableManager from "../ported/dashboard/tables/TableManager";
+﻿import { useEffect, useState } from "react";
+import { PageHeader } from "../../components/ui";
+import { useT } from "../../lib/i18n/I18nProvider";
+import { supabase } from "../../lib/supabase";
+import type { DiningTable, TableZone } from "../../lib/types";
+import TableManager from "../../ported/dashboard/tables/TableManager";
 
 export function TablesPage({ restaurantId }: { restaurantId: string }) {
   const { t } = useT();
@@ -57,3 +57,4 @@ export function TablesPage({ restaurantId }: { restaurantId: string }) {
     </>
   );
 }
+

@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
-import I18nPageHeader from "../components/I18nPageHeader";
-import { RESTAURANT_SELECT } from "../lib/db/selects";
-import { supabase } from "../lib/supabase";
-import type { Restaurant } from "../lib/types";
-import SettingsForm from "../ported/dashboard/settings/SettingsForm";
-import SettingsTeamHeadingClient from "../ported/dashboard/settings/SettingsTeamHeadingClient";
-import StaffManager from "../ported/dashboard/settings/StaffManager";
+﻿import { useEffect, useState } from "react";
+import I18nPageHeader from "../../components/I18nPageHeader";
+import { RESTAURANT_SELECT } from "../../lib/db/selects";
+import { supabase } from "../../lib/supabase";
+import type { Restaurant } from "../../lib/types";
+import SettingsForm from "../../ported/dashboard/settings/SettingsForm";
+import SettingsTeamHeadingClient from "../../ported/dashboard/settings/SettingsTeamHeadingClient";
+import StaffManager from "../../ported/dashboard/settings/StaffManager";
 
 interface StaffMember {
   id: string;
@@ -84,3 +84,4 @@ export function SettingsPage({ restaurantId }: { restaurantId: string }) {
     </div>
   );
 }
+

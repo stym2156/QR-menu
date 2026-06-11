@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
-import AuditView, { type AuditLogRow } from "../ported/dashboard/audit/AuditView";
+﻿import { useEffect, useState } from "react";
+import { supabase } from "../../lib/supabase";
+import AuditView, { type AuditLogRow } from "../../ported/dashboard/audit/AuditView";
 
 interface AuditData {
   rows: AuditLogRow[];
@@ -48,3 +48,4 @@ export function AuditPage({ restaurantId }: { restaurantId: string }) {
     </div>
   );
 }
+

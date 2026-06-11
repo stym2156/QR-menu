@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
-import { PageHeader } from "../components/ui";
-import { useT } from "../lib/i18n/I18nProvider";
-import { supabase } from "../lib/supabase";
-import type { Category } from "../lib/types";
-import CategoryManager from "../ported/dashboard/categories/CategoryManager";
+﻿import { useEffect, useState } from "react";
+import { PageHeader } from "../../components/ui";
+import { useT } from "../../lib/i18n/I18nProvider";
+import { supabase } from "../../lib/supabase";
+import type { Category } from "../../lib/types";
+import CategoryManager from "../../ported/dashboard/categories/CategoryManager";
 
 export function CategoriesPage({ restaurantId }: { restaurantId: string }) {
   const { t } = useT();
@@ -35,3 +35,4 @@ export function CategoriesPage({ restaurantId }: { restaurantId: string }) {
     </>
   );
 }
+

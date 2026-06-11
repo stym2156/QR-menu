@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
-import type { Feedback } from "../lib/types";
-import FeedbackView from "../ported/dashboard/feedback/FeedbackView";
+﻿import { useEffect, useState } from "react";
+import { supabase } from "../../lib/supabase";
+import type { Feedback } from "../../lib/types";
+import FeedbackView from "../../ported/dashboard/feedback/FeedbackView";
 
 interface FeedbackData {
   userId: string;
@@ -56,3 +56,4 @@ export function FeedbackPage({ restaurantId }: { restaurantId: string }) {
     </div>
   );
 }
+

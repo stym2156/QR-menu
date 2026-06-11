@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
-import I18nPageHeader from "../components/I18nPageHeader";
-import { PROMOTION_SELECT } from "../lib/db/selects";
-import { supabase } from "../lib/supabase";
-import type { Promotion } from "../lib/types";
-import PromotionManager from "../ported/dashboard/promotions/PromotionManager";
+﻿import { useEffect, useState } from "react";
+import I18nPageHeader from "../../components/I18nPageHeader";
+import { PROMOTION_SELECT } from "../../lib/db/selects";
+import { supabase } from "../../lib/supabase";
+import type { Promotion } from "../../lib/types";
+import PromotionManager from "../../ported/dashboard/promotions/PromotionManager";
 
 export function PromotionsPage({ restaurantId }: { restaurantId: string }) {
   const [promotions, setPromotions] = useState<Promotion[] | null>(null);
@@ -38,3 +38,4 @@ export function PromotionsPage({ restaurantId }: { restaurantId: string }) {
     </div>
   );
 }
+

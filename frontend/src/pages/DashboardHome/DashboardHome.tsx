@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
-import type { OrderStatus, Restaurant } from "../lib/types";
-import DashboardCards from "../ported/dashboard/DashboardCards";
+﻿import { useEffect, useState } from "react";
+import { supabase } from "../../lib/supabase";
+import type { OrderStatus, Restaurant } from "../../lib/types";
+import DashboardCards from "../../ported/dashboard/DashboardCards";
 
 export interface RecentDashboardOrder {
   id: string;
@@ -151,3 +151,4 @@ async function loadSummary(restaurantId: string): Promise<Summary> {
     })),
   };
 }
+

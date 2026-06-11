@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
-import I18nPageHeader from "../components/I18nPageHeader";
+﻿import { useEffect, useState } from "react";
+import I18nPageHeader from "../../components/I18nPageHeader";
 import {
   MENU_SELECT,
   ORDER_SELECT,
   TABLE_SELECT,
   TABLE_ZONE_SELECT,
-} from "../lib/db/selects";
-import { supabase } from "../lib/supabase";
-import type { DiningTable, Menu, Order, Role, TableZone } from "../lib/types";
-import KitchenDisplay from "../ported/dashboard/kitchen/KitchenDisplay";
+} from "../../lib/db/selects";
+import { supabase } from "../../lib/supabase";
+import type { DiningTable, Menu, Order, Role, TableZone } from "../../lib/types";
+import KitchenDisplay from "../../ported/dashboard/kitchen/KitchenDisplay";
 
 interface KitchenData {
   orders: Order[];
@@ -115,3 +115,4 @@ export function KitchenPage({
     </div>
   );
 }
+

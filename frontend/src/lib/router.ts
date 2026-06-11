@@ -2,6 +2,8 @@ export type Route =
   | { name: "home" }
   | { name: "login" }
   | { name: "signup" }
+  | { name: "forgot-password" }
+  | { name: "reset-password" }
   | {
       name: "dashboard";
       page:
@@ -27,6 +29,8 @@ export function parseRoute(pathname = window.location.pathname): Route {
   if (parts.length === 0) return { name: "home" };
   if (parts[0] === "login") return { name: "login" };
   if (parts[0] === "signup") return { name: "signup" };
+  if (parts[0] === "forgot-password") return { name: "forgot-password" };
+  if (parts[0] === "reset-password") return { name: "reset-password" };
   if (parts[0] === "dashboard") {
     const page = (parts[1] ?? "home") as Route extends { name: "dashboard"; page: infer P } ? P : never;
     if ([
