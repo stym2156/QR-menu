@@ -23,7 +23,7 @@ const NAV: NavItem[] = [
   {
     href: "/dashboard/menu",
     labelKey: "nav.menu",
-    allowedRoles: ["owner", "cook", "waiter", "staff"],
+    allowedRoles: ["owner"],
     icon: <path strokeLinecap="round" strokeLinejoin="round" d="M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm3 4h8M8 12h8M8 16h5" />,
   },
   {
@@ -34,7 +34,7 @@ const NAV: NavItem[] = [
   {
     href: "/dashboard/tables",
     labelKey: "nav.tables",
-    allowedRoles: ["owner", "cook", "waiter"],
+    allowedRoles: ["owner", "cook", "waiter", "staff"],
     icon: <path strokeLinecap="round" strokeLinejoin="round" d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z" />,
   },
   {

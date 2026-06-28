@@ -1,27 +1,20 @@
-node_modules
-.next
-dist
-out
-.env
-.env.local
-.env*.local
-*.log
 .DS_Store
-next-env.d.ts
-.vercel
-.turbo
-tsconfig.tsbuildinfo
-*.tsbuildinfo
 
-# IDE / editor state
-.claude/
-.idea/
-.vscode/
+# Environment files
+.env
+.env.*
+!.env.example
 
-# Playwright
-playwright-report/
-test-results/
-playwright/.cache/
+# Dependencies
+node_modules/
 
-# Sentry
-.sentryclirc
+# Build output
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

@@ -90,7 +90,7 @@ export function KitchenPage({
     };
   }, [restaurantId]);
 
-  const canAct = role === "owner" || role === "cook" || role === "staff";
+  const canAct = role === "owner" || role === "cook";
 
   return (
     <div>
@@ -115,4 +115,3 @@ export function KitchenPage({
     </div>
   );
 }
-

@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
-import type { OrderStatus, Restaurant } from "../../lib/types";
+import type { OrderStatus, Restaurant, Role } from "../../lib/types";
 import DashboardCards from "../../ported/dashboard/DashboardCards";
 
 export interface RecentDashboardOrder {
@@ -56,7 +56,13 @@ const emptySummary: Summary = {
   recentOrders: [],
 };
 
-export function DashboardHome({ restaurant }: { restaurant: Restaurant | null }) {
+export function DashboardHome({
+  restaurant,
+  role,
+}: {
+  restaurant: Restaurant | null;
+  role: Role;
+}) {
   const [summary, setSummary] = useState<Summary>(emptySummary);
 
   useEffect(() => {
@@ -64,7 +70,7 @@ export function DashboardHome({ restaurant }: { restaurant: Restaurant | null })
     void loadSummary(restaurant.id).then(setSummary);
   }, [restaurant]);
 
-  return <DashboardCards restaurant={restaurant} {...summary} />;
+  return <DashboardCards restaurant={restaurant} role={role} {...summary} />;
 }
 
 async function loadSummary(restaurantId: string): Promise<Summary> {
@@ -151,4 +157,3 @@ async function loadSummary(restaurantId: string): Promise<Summary> {
     })),
   };
 }
-

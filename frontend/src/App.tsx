@@ -3,7 +3,8 @@ import { DashboardLayout } from "./layouts/DashboardLayout";
 import { hasSupabaseEnv } from "./lib/env";
 import { parseRoute, type Route } from "./lib/router";
 import { useWorkspace } from "./lib/workspace";
-import { ForgotPasswordPage, LoginPage, ResetPasswordPage, SignupPage } from "./pages/Auth/AuthPages";
+import type { Role } from "./lib/types";
+import { ForgotPasswordPage, JoinInvitePage, LoginPage, ResetPasswordPage, SignupPage } from "./pages/Auth/AuthPages";
 
 const BillsPage = lazy(() => import("./pages/Bills/BillsPage").then((m) => ({ default: m.BillsPage })));
 const CategoriesPage = lazy(() => import("./pages/Categories/CategoriesPage").then((m) => ({ default: m.CategoriesPage })));
@@ -18,6 +19,21 @@ const PromotionsPage = lazy(() => import("./pages/Promotions/PromotionsPage").th
 const SettingsPage = lazy(() => import("./pages/Settings/SettingsPage").then((m) => ({ default: m.SettingsPage })));
 const StatsPage = lazy(() => import("./pages/Stats/StatsPage").then((m) => ({ default: m.StatsPage })));
 const TablesPage = lazy(() => import("./pages/Tables/TablesPage").then((m) => ({ default: m.TablesPage })));
+
+type DashboardPage = Extract<Route, { name: "dashboard" }>["page"];
+
+function defaultPageForRole(role: Role): DashboardPage {
+  if (role === "cook") return "kitchen";
+  if (role === "waiter" || role === "staff") return "bills";
+  return "home";
+}
+
+function canAccessDashboardPage(role: Role, page: DashboardPage): boolean {
+  if (role === "owner") return true;
+  if (role === "cook") return ["home", "kitchen", "bills", "tables"].includes(page);
+  if (role === "waiter" || role === "staff") return ["home", "bills", "tables", "kitchen"].includes(page);
+  return page === "home";
+}
 
 export default function App() {
   const [route, setRoute] = useState<Route>(() => parseRoute());
@@ -49,6 +65,7 @@ export default function App() {
 
   if (route.name === "login") return <LoginPage />;
   if (route.name === "signup") return <SignupPage />;
+  if (route.name === "join") return <JoinInvitePage token={route.token} />;
   if (route.name === "forgot-password") return <ForgotPasswordPage />;
   if (route.name === "reset-password") return <ResetPasswordPage />;
   if (route.name === "home") return <LoginPage />;
@@ -56,6 +73,9 @@ export default function App() {
   if (route.name === "dashboard") {
     if (workspace.loading) return <PageLoading />;
     if (!workspace.userId) return <LoginPage />;
+    const page = canAccessDashboardPage(workspace.role, route.page)
+      ? route.page
+      : defaultPageForRole(workspace.role);
 
     return (
       <div className="relative min-h-screen overflow-hidden bg-canvas">
@@ -66,32 +86,32 @@ export default function App() {
               <section className="rounded-2xl border border-line bg-surface/90 p-6 text-muted shadow-card">
                 No restaurant data found. Please check the Supabase setup and signup trigger.
               </section>
-            ) : route.page === "home" ? (
-              <DashboardHome restaurant={workspace.restaurant} />
-            ) : route.page === "menu" ? (
+            ) : page === "home" ? (
+              <DashboardHome restaurant={workspace.restaurant} role={workspace.role} />
+            ) : page === "menu" ? (
               <MenuPage restaurantId={workspace.restaurant.id} />
-            ) : route.page === "categories" ? (
+            ) : page === "categories" ? (
               <CategoriesPage restaurantId={workspace.restaurant.id} />
-            ) : route.page === "tables" ? (
-              <TablesPage restaurantId={workspace.restaurant.id} />
-            ) : route.page === "kitchen" ? (
+            ) : page === "tables" ? (
+              <TablesPage restaurantId={workspace.restaurant.id} role={workspace.role} />
+            ) : page === "kitchen" ? (
               <KitchenPage restaurantId={workspace.restaurant.id} role={workspace.role} />
-            ) : route.page === "bills" ? (
+            ) : page === "bills" ? (
               <BillsPage restaurantId={workspace.restaurant.id} role={workspace.role} />
-            ) : route.page === "settings" ? (
+            ) : page === "settings" ? (
               <SettingsPage restaurantId={workspace.restaurant.id} />
-            ) : route.page === "stats" ? (
+            ) : page === "stats" ? (
               <StatsPage restaurantId={workspace.restaurant.id} />
-            ) : route.page === "promotions" ? (
+            ) : page === "promotions" ? (
               <PromotionsPage restaurantId={workspace.restaurant.id} />
-            ) : route.page === "close-shop" ? (
+            ) : page === "close-shop" ? (
               <CloseShopPage restaurantId={workspace.restaurant.id} />
-            ) : route.page === "audit" ? (
+            ) : page === "audit" ? (
               <AuditPage restaurantId={workspace.restaurant.id} />
-            ) : route.page === "feedback" ? (
+            ) : page === "feedback" ? (
               <FeedbackPage restaurantId={workspace.restaurant.id} />
             ) : (
-              <DashboardHome restaurant={workspace.restaurant} />
+              <DashboardHome restaurant={workspace.restaurant} role={workspace.role} />
             )}
           </Suspense>
         </DashboardLayout>

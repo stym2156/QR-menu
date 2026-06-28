@@ -2,10 +2,16 @@
 import { PageHeader } from "../../components/ui";
 import { useT } from "../../lib/i18n/I18nProvider";
 import { supabase } from "../../lib/supabase";
-import type { DiningTable, TableZone } from "../../lib/types";
+import type { DiningTable, Role, TableZone } from "../../lib/types";
 import TableManager from "../../ported/dashboard/tables/TableManager";
 
-export function TablesPage({ restaurantId }: { restaurantId: string }) {
+export function TablesPage({
+  restaurantId,
+  role,
+}: {
+  restaurantId: string;
+  role: Role;
+}) {
   const { t } = useT();
   const [state, setState] = useState<{
     tables: DiningTable[];
@@ -46,15 +52,23 @@ export function TablesPage({ restaurantId }: { restaurantId: string }) {
 
   return (
     <>
-      <PageHeader title={t("page.tables.title")} description={t("page.tables.desc.owner")} />
+      <PageHeader
+        title={t("page.tables.title")}
+        description={
+          role === "owner"
+            ? t("page.tables.desc.owner")
+            : role === "cook"
+              ? "ดูสถานะโต๊ะได้อย่างเดียว"
+              : t("page.tables.desc.waiter")
+        }
+      />
       <TableManager
         restaurantId={restaurantId}
         initialTables={state.tables}
         initialZones={state.zones}
-        canManage
-        canAct
+        canManage={role === "owner"}
+        canAct={role === "owner" || role === "waiter" || role === "staff"}
       />
     </>
   );
 }
-

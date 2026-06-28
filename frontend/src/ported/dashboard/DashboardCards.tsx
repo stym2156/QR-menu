@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useT } from "@/lib/i18n/I18nProvider";
 import { formatKIP, formatTime } from "@/lib/format";
-import type { OrderStatus, Restaurant } from "@/lib/types";
+import type { OrderStatus, Restaurant, Role } from "@/lib/types";
 
 interface RecentDashboardOrder {
   id: string;
@@ -16,6 +16,7 @@ interface RecentDashboardOrder {
 
 interface Props {
   restaurant: Restaurant | null;
+  role: Role;
   todayRevenue: number;
   todayPaidCount: number;
   pendingCount: number;
@@ -39,6 +40,7 @@ interface Props {
 
 export default function DashboardCards({
   restaurant,
+  role,
   todayRevenue,
   todayPaidCount,
   pendingCount,
@@ -60,16 +62,19 @@ export default function DashboardCards({
   recentOrders,
 }: Props) {
   const { t } = useT();
+  const isOwner = role === "owner";
 
   return (
     <>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label={t("stat.today_sales")}
-          value={formatKIP(todayRevenue)}
-          sub={t("stat.paid_orders", { n: todayPaidCount })}
-          href="/dashboard/stats"
-        />
+        {isOwner ? (
+          <StatCard
+            label={t("stat.today_sales")}
+            value={formatKIP(todayRevenue)}
+            sub={t("stat.paid_orders", { n: todayPaidCount })}
+            href="/dashboard/stats"
+          />
+        ) : null}
         <StatCard
           label={t("stat.pending_orders")}
           value={String(pendingCount)}
@@ -88,37 +93,39 @@ export default function DashboardCards({
           label={t("stat.calls")}
           value={String(callCount)}
           sub={t("stat.calls_waiting")}
-          href="/dashboard/kitchen"
+          href="/dashboard/bills"
           highlight={callCount > 0}
         />
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <InfoPanel
-          title={t("dash.panel.shop")}
-          href="/dashboard/settings"
-          rows={[
-            {
-              label: t("dash.shop.status"),
-              value: restaurant?.accepting_orders ? t("dash.shop.open") : t("dash.shop.closed"),
-              tone: restaurant?.accepting_orders ? "good" : "warn",
-            },
-            {
-              label: t("dash.shop.hours"),
-              value:
-                restaurant?.open_time && restaurant?.close_time
-                  ? `${restaurant.open_time} - ${restaurant.close_time}`
-                  : t("dash.shop.no_hours"),
-            },
-            {
-              label: t("dash.shop.tax"),
-              value: t("dash.shop.tax_value", {
-                service: restaurant?.service_charge_pct ?? 0,
-                vat: restaurant?.vat_pct ?? 0,
-              }),
-            },
-          ]}
-        />
+        {isOwner ? (
+          <InfoPanel
+            title={t("dash.panel.shop")}
+            href="/dashboard/settings"
+            rows={[
+              {
+                label: t("dash.shop.status"),
+                value: restaurant?.accepting_orders ? t("dash.shop.open") : t("dash.shop.closed"),
+                tone: restaurant?.accepting_orders ? "good" : "warn",
+              },
+              {
+                label: t("dash.shop.hours"),
+                value:
+                  restaurant?.open_time && restaurant?.close_time
+                    ? `${restaurant.open_time} - ${restaurant.close_time}`
+                    : t("dash.shop.no_hours"),
+              },
+              {
+                label: t("dash.shop.tax"),
+                value: t("dash.shop.tax_value", {
+                  service: restaurant?.service_charge_pct ?? 0,
+                  vat: restaurant?.vat_pct ?? 0,
+                }),
+              },
+            ]}
+          />
+        ) : null}
         <InfoPanel
           title={t("dash.panel.tables")}
           href="/dashboard/tables"
@@ -128,36 +135,40 @@ export default function DashboardCards({
             { label: t("dash.tables.total"), value: tableCount },
           ]}
         />
-        <InfoPanel
-          title={t("dash.panel.menu")}
-          href="/dashboard/menu"
-          rows={[
-            {
-              label: t("dash.menu.available"),
-              value: availableMenuCount,
-              tone: availableMenuCount > 0 ? "good" : undefined,
-            },
-            {
-              label: t("dash.menu.unavailable"),
-              value: unavailableMenuCount,
-              tone: unavailableMenuCount > 0 ? "warn" : undefined,
-            },
-            { label: t("dash.menu.categories"), value: categoryCount },
-          ]}
-        />
-        <InfoPanel
-          title={t("dash.panel.promotions")}
-          href="/dashboard/promotions"
-          rows={[
-            {
-              label: t("dash.promos.active"),
-              value: activePromotionCount,
-              tone: activePromotionCount > 0 ? "good" : undefined,
-            },
-            { label: t("dash.promos.scheduled"), value: scheduledPromotionCount },
-            { label: t("dash.promos.total"), value: activePromotionCount + scheduledPromotionCount },
-          ]}
-        />
+        {isOwner ? (
+          <>
+            <InfoPanel
+              title={t("dash.panel.menu")}
+              href="/dashboard/menu"
+              rows={[
+                {
+                  label: t("dash.menu.available"),
+                  value: availableMenuCount,
+                  tone: availableMenuCount > 0 ? "good" : undefined,
+                },
+                {
+                  label: t("dash.menu.unavailable"),
+                  value: unavailableMenuCount,
+                  tone: unavailableMenuCount > 0 ? "warn" : undefined,
+                },
+                { label: t("dash.menu.categories"), value: categoryCount },
+              ]}
+            />
+            <InfoPanel
+              title={t("dash.panel.promotions")}
+              href="/dashboard/promotions"
+              rows={[
+                {
+                  label: t("dash.promos.active"),
+                  value: activePromotionCount,
+                  tone: activePromotionCount > 0 ? "good" : undefined,
+                },
+                { label: t("dash.promos.scheduled"), value: scheduledPromotionCount },
+                { label: t("dash.promos.total"), value: activePromotionCount + scheduledPromotionCount },
+              ]}
+            />
+          </>
+        ) : null}
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_0.9fr]">
