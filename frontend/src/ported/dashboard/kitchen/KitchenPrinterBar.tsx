@@ -53,6 +53,10 @@ export function KitchenPrinterBar({
   const [autoPrint, setAutoPrint] = useState(true);
   const [systemPrint, setSystemPrint] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const kitchenUrl =
+    typeof window === "undefined"
+      ? "/dashboard/kitchen"
+      : `${window.location.origin}/dashboard/kitchen`;
 
   useEffect(() => {
     setHydrated(true);
@@ -291,7 +295,7 @@ export function KitchenPrinterBar({
                   {t("kitchen_print.kiosk.windows")}
                 </p>
                 <pre className="overflow-x-auto rounded bg-ink/95 px-2.5 py-2 text-[10px] leading-relaxed text-surface">
-{`"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --kiosk-printing https://qr-menu-eta-seven.vercel.app/dashboard/kitchen`}
+{`"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --kiosk-printing ${kitchenUrl}`}
                 </pre>
               </div>
 
@@ -300,7 +304,7 @@ export function KitchenPrinterBar({
                   {t("kitchen_print.kiosk.mac")}
                 </p>
                 <pre className="overflow-x-auto rounded bg-ink/95 px-2.5 py-2 text-[10px] leading-relaxed text-surface">
-{`open -a "Google Chrome" --args --kiosk-printing https://qr-menu-eta-seven.vercel.app/dashboard/kitchen`}
+{`open -a "Google Chrome" --args --kiosk-printing ${kitchenUrl}`}
                 </pre>
               </div>
 
